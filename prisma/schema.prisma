@@ -24,10 +24,13 @@ model Wheel {
   title           String    @default("Viewer Games")
   displayToken    String    @unique @default(cuid())
   webhookSecret   String    @unique @default(cuid())
-  removeOnWin     Boolean   @default(true)
-  spinDurationMs  Int       @default(8000)
-  soundEnabled    Boolean   @default(true)
-  allowDuplicates Boolean   @default(false)
+  removeOnWin       Boolean   @default(true)
+  spinDurationMs    Int       @default(8000)
+  soundEnabled      Boolean   @default(true)
+  celebrateEnabled  Boolean   @default(true)
+  spinVolume        Int       @default(80)
+  celebrateVolume   Int       @default(95)
+  allowDuplicates   Boolean   @default(false)
   isSpinning      Boolean   @default(false)
   spinStartedAt   DateTime?
   spinEndsAt      DateTime?

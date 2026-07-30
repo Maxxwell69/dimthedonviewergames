@@ -20,6 +20,9 @@ export type WheelDTO = {
   removeOnWin: boolean;
   spinDurationMs: number;
   soundEnabled: boolean;
+  celebrateEnabled: boolean;
+  spinVolume: number;
+  celebrateVolume: number;
   allowDuplicates?: boolean;
   isSpinning: boolean;
   spinStartedAt: string | null;
@@ -32,3 +35,8 @@ export type WheelDTO = {
   winners: WinnerDTO[];
   updatedAt: string;
 };
+
+export function clampVolume(value: number) {
+  if (!Number.isFinite(value)) return 80;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}

@@ -7,6 +7,7 @@ export function useWheelSpinSound(
   isSpinning: boolean,
   spinStartedAt: string | null | undefined,
   enabled: boolean,
+  volume = 80,
 ) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastSpinKey = useRef<string | null>(null);
@@ -24,6 +25,12 @@ export function useWheelSpinSound(
   }, []);
 
   useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = Math.max(0, Math.min(1, volume / 100));
+    }
+  }, [volume]);
+
+  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -38,9 +45,10 @@ export function useWheelSpinSound(
     if (lastSpinKey.current === key) return;
     lastSpinKey.current = key;
 
+    audio.volume = Math.max(0, Math.min(1, volume / 100));
     audio.currentTime = 0;
     void audio.play().catch(() => {
       // Autoplay can be blocked until a user gesture; dashboard spins usually have one.
     });
-  }, [enabled, isSpinning, spinStartedAt]);
+  }, [enabled, isSpinning, spinStartedAt, volume]);
 }

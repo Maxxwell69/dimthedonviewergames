@@ -16,6 +16,7 @@ type DonWheelProps = {
   spinDurationMs: number;
   spinStartedAt?: string | null;
   soundEnabled?: boolean;
+  spinVolume?: number;
   onSpinComplete?: () => void;
   size?: number;
   interactive?: boolean;
@@ -38,6 +39,7 @@ export function DonWheel({
   spinDurationMs,
   spinStartedAt,
   soundEnabled = true,
+  spinVolume = 80,
   onSpinComplete,
   size = 520,
   interactive = false,
@@ -48,7 +50,7 @@ export function DonWheel({
   const completedForSpin = useRef<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useWheelSpinSound(isSpinning, spinStartedAt, soundEnabled);
+  useWheelSpinSound(isSpinning, spinStartedAt, soundEnabled, spinVolume);
 
   const segments = useMemo(() => {
     if (!entries.length) {

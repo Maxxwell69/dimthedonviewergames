@@ -208,6 +208,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
             spinDurationMs={wheel.spinDurationMs}
             spinStartedAt={wheel.spinStartedAt}
             soundEnabled={wheel.soundEnabled}
+            spinVolume={wheel.spinVolume ?? 80}
             interactive
             onRequestSpin={spin}
             onSpinComplete={() => setShowWinner(true)}
@@ -217,7 +218,8 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
           <WinnerOverlay
             winner={wheel.currentWinner}
             visible={showWinner && !wheel.isSpinning}
-            soundEnabled={wheel.soundEnabled}
+            celebrateEnabled={wheel.celebrateEnabled ?? true}
+            celebrateVolume={wheel.celebrateVolume ?? 95}
             showControls
             onDismiss={() => runAction("dismissWinner")}
           />
@@ -277,7 +279,61 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
                 checked={wheel.soundEnabled}
                 onChange={(e) => patchSettings({ soundEnabled: e.target.checked })}
               />
-              Spin sound
+              Spin sound FX
+            </label>
+            <label className={`field volume-field ${wheel.soundEnabled ? "" : "disabled"}`}>
+              Spin volume ({wheel.spinVolume ?? 80}%)
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                disabled={!wheel.soundEnabled}
+                value={wheel.spinVolume ?? 80}
+                onChange={(e) =>
+                  setWheel((w) => ({ ...w, spinVolume: Number(e.target.value) }))
+                }
+                onMouseUp={(e) =>
+                  patchSettings({ spinVolume: Number((e.target as HTMLInputElement).value) })
+                }
+                onTouchEnd={(e) =>
+                  patchSettings({ spinVolume: Number((e.target as HTMLInputElement).value) })
+                }
+              />
+            </label>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={wheel.celebrateEnabled ?? true}
+                onChange={(e) => patchSettings({ celebrateEnabled: e.target.checked })}
+              />
+              Celebrate (confetti + cheer)
+            </label>
+            <label
+              className={`field volume-field ${wheel.celebrateEnabled ?? true ? "" : "disabled"}`}
+            >
+              Celebrate volume ({wheel.celebrateVolume ?? 95}%)
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                disabled={!(wheel.celebrateEnabled ?? true)}
+                value={wheel.celebrateVolume ?? 95}
+                onChange={(e) =>
+                  setWheel((w) => ({ ...w, celebrateVolume: Number(e.target.value) }))
+                }
+                onMouseUp={(e) =>
+                  patchSettings({
+                    celebrateVolume: Number((e.target as HTMLInputElement).value),
+                  })
+                }
+                onTouchEnd={(e) =>
+                  patchSettings({
+                    celebrateVolume: Number((e.target as HTMLInputElement).value),
+                  })
+                }
+              />
             </label>
             <label className="field">
               Spin duration (ms)

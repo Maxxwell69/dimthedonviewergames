@@ -16,6 +16,11 @@ export async function PATCH(req: Request) {
     spinDurationMs:
       typeof body.spinDurationMs === "number" ? body.spinDurationMs : undefined,
     soundEnabled: typeof body.soundEnabled === "boolean" ? body.soundEnabled : undefined,
+    celebrateEnabled:
+      typeof body.celebrateEnabled === "boolean" ? body.celebrateEnabled : undefined,
+    spinVolume: typeof body.spinVolume === "number" ? body.spinVolume : undefined,
+    celebrateVolume:
+      typeof body.celebrateVolume === "number" ? body.celebrateVolume : undefined,
     allowDuplicates:
       typeof body.allowDuplicates === "boolean" ? body.allowDuplicates : undefined,
     entriesText: typeof body.entriesText === "string" ? body.entriesText : undefined,

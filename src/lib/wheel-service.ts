@@ -7,6 +7,7 @@ import {
   shuffleArray,
   targetAngleForIndex,
 } from "@/lib/wheel-math";
+import { clampVolume } from "@/lib/types";
 
 const wheelInclude = {
   entries: { orderBy: { sortOrder: "asc" as const } },
@@ -61,6 +62,9 @@ export function serializeWheel(
     removeOnWin: wheel.removeOnWin,
     spinDurationMs: wheel.spinDurationMs,
     soundEnabled: wheel.soundEnabled,
+    celebrateEnabled: wheel.celebrateEnabled,
+    spinVolume: wheel.spinVolume,
+    celebrateVolume: wheel.celebrateVolume,
     allowDuplicates: wheel.allowDuplicates,
     isSpinning: wheel.isSpinning,
     spinStartedAt: wheel.spinStartedAt?.toISOString() ?? null,
@@ -97,6 +101,9 @@ export function serializeDisplayWheel(
     removeOnWin: full.removeOnWin,
     spinDurationMs: full.spinDurationMs,
     soundEnabled: full.soundEnabled,
+    celebrateEnabled: full.celebrateEnabled,
+    spinVolume: full.spinVolume,
+    celebrateVolume: full.celebrateVolume,
     isSpinning: full.isSpinning,
     spinStartedAt: full.spinStartedAt,
     spinEndsAt: full.spinEndsAt,
@@ -149,6 +156,9 @@ export async function updateWheelSettings(
     removeOnWin?: boolean;
     spinDurationMs?: number;
     soundEnabled?: boolean;
+    celebrateEnabled?: boolean;
+    spinVolume?: number;
+    celebrateVolume?: number;
     allowDuplicates?: boolean;
     entriesText?: string;
   },
@@ -164,6 +174,13 @@ export async function updateWheelSettings(
       removeOnWin: data.removeOnWin,
       spinDurationMs: data.spinDurationMs,
       soundEnabled: data.soundEnabled,
+      celebrateEnabled: data.celebrateEnabled,
+      spinVolume:
+        typeof data.spinVolume === "number" ? clampVolume(data.spinVolume) : undefined,
+      celebrateVolume:
+        typeof data.celebrateVolume === "number"
+          ? clampVolume(data.celebrateVolume)
+          : undefined,
       allowDuplicates: data.allowDuplicates,
     },
     include: {

@@ -6,7 +6,8 @@ import confetti from "canvas-confetti";
 type WinnerOverlayProps = {
   winner: string | null;
   visible: boolean;
-  soundEnabled?: boolean;
+  celebrateEnabled?: boolean;
+  celebrateVolume?: number;
   onDismiss?: () => void;
   showControls?: boolean;
 };
@@ -14,7 +15,8 @@ type WinnerOverlayProps = {
 export function WinnerOverlay({
   winner,
   visible,
-  soundEnabled = true,
+  celebrateEnabled = true,
+  celebrateVolume = 95,
   onDismiss,
   showControls = false,
 }: WinnerOverlayProps) {
@@ -26,11 +28,11 @@ export function WinnerOverlay({
       return;
     }
 
-    // One celebration per winner reveal
     if (celebratedFor.current === winner) return;
     celebratedFor.current = winner;
 
-    // Gold / maroon Dom the Don confetti burst
+    if (!celebrateEnabled) return;
+
     const colors = ["#c9a24d", "#e8d08a", "#9b1524", "#ffffff", "#5c0a14"];
     const defaults = { colors, disableForReducedMotion: true };
 
@@ -59,12 +61,10 @@ export function WinnerOverlay({
       });
     }, 220);
 
-    if (soundEnabled) {
-      const cheer = new Audio("/sounds/winner-cheer.mp3");
-      cheer.volume = 0.95;
-      void cheer.play().catch(() => undefined);
-    }
-  }, [visible, winner, soundEnabled]);
+    const cheer = new Audio("/sounds/winner-cheer.mp3");
+    cheer.volume = Math.max(0, Math.min(1, celebrateVolume / 100));
+    void cheer.play().catch(() => undefined);
+  }, [visible, winner, celebrateEnabled, celebrateVolume]);
 
   if (!visible || !winner) return null;
 

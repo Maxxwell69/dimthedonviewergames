@@ -50,13 +50,15 @@ pre {
 }
 
 .brand-logo {
-  width: min(420px, 82vw);
+  width: min(460px, 88vw);
   height: auto;
-  filter: drop-shadow(0 0 28px rgba(180, 30, 40, 0.55));
+  object-fit: contain;
+  background: transparent;
+  filter: drop-shadow(0 0 28px rgba(180, 30, 40, 0.45));
 }
 
 .brand-header.compact .brand-logo {
-  width: min(280px, 70vw);
+  width: min(320px, 75vw);
 }
 
 .brand-banner {
@@ -272,6 +274,20 @@ pre {
   gap: 0.55rem;
   margin: 0.55rem 0;
   color: var(--muted);
+}
+
+.volume-field {
+  margin-top: 0.35rem;
+}
+
+.volume-field.disabled {
+  opacity: 0.45;
+}
+
+.volume-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--gold);
+  cursor: pointer;
 }
 
 .url-box {
