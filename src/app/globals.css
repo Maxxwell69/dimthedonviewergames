@@ -401,29 +401,40 @@ pre {
   padding-bottom: 2rem;
 }
 
-/* OBS / stream overlay: wheel only, transparent page */
+/* OBS / TikTok Studio overlay: wheel only, fully transparent page */
 html.overlay-mode,
 html.overlay-mode body,
+html.overlay-mode #__next,
 .display-shell.overlay-mode {
   background: transparent !important;
+  background-color: transparent !important;
   background-image: none !important;
+  box-shadow: none !important;
 }
 
 .display-shell.overlay-mode {
   min-height: 100vh;
   min-height: 100dvh;
+  width: 100%;
+  margin: 0;
   padding: 0;
   gap: 0;
   place-content: center;
   place-items: center;
+  overflow: hidden;
 }
 
-.display-shell.overlay-mode .wheel-stage {
-  filter: drop-shadow(0 0 28px rgba(160, 20, 30, 0.35));
+.display-shell.overlay-mode .wheel-stage,
+.display-shell.overlay-mode .wheel-stage-clean,
+.display-shell.overlay-mode .wheel-canvas {
+  background: transparent !important;
+  filter: none !important;
+  box-shadow: none !important;
 }
 
+/* No dim plate behind winner card in overlay */
 .display-shell.overlay-mode .winner-overlay {
-  background: rgba(0, 0, 0, 0.35);
+  background: transparent !important;
 }
 
 .display-title {

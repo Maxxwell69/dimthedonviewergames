@@ -21,6 +21,8 @@ type DonWheelProps = {
   size?: number;
   interactive?: boolean;
   onRequestSpin?: () => void;
+  /** Skip soft glows that read as a shaded box in OBS / TikTok Studio overlays. */
+  cleanOverlay?: boolean;
 };
 
 const MAROON = "#5c0a14";
@@ -44,6 +46,7 @@ export function DonWheel({
   size = 520,
   interactive = false,
   onRequestSpin,
+  cleanOverlay = false,
 }: DonWheelProps) {
   const [angle, setAngle] = useState(0);
   const [hubLogo, setHubLogo] = useState<HTMLImageElement | null>(null);
@@ -117,14 +120,16 @@ export function DonWheel({
 
     ctx.clearRect(0, 0, size, size);
 
-    // Outer red glow
-    const glow = ctx.createRadialGradient(cx, cy, radius * 0.7, cx, cy, radius * 1.25);
-    glow.addColorStop(0, "rgba(180, 20, 30, 0.35)");
-    glow.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius * 1.25, 0, Math.PI * 2);
-    ctx.fill();
+    if (!cleanOverlay) {
+      // Outer red glow (skipped in overlay — reads as a shaded box in TikTok Studio)
+      const glow = ctx.createRadialGradient(cx, cy, radius * 0.7, cx, cy, radius * 1.25);
+      glow.addColorStop(0, "rgba(180, 20, 30, 0.35)");
+      glow.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius * 1.25, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Outer studded rim
     ctx.beginPath();
@@ -196,10 +201,12 @@ export function DonWheel({
 
     // Center hub with Dom the Don D logo
     const hubR = radius * 0.22;
-    ctx.beginPath();
-    ctx.arc(cx, cy, hubR + 8, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(180,20,30,0.75)";
-    ctx.fill();
+    if (!cleanOverlay) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, hubR + 8, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(180,20,30,0.75)";
+      ctx.fill();
+    }
 
     const hubGrad = ctx.createRadialGradient(cx - 8, cy - 8, 4, cx, cy, hubR);
     hubGrad.addColorStop(0, "#1a1208");
@@ -227,13 +234,17 @@ export function DonWheel({
       ctx.textBaseline = "middle";
       ctx.fillText("D", cx, cy + 2);
     }
-  }, [angle, segments, size, hubLogo]);
+  }, [angle, segments, size, hubLogo, cleanOverlay]);
 
   return (
-    <div className="wheel-stage" style={{ width: size, height: size }}>
+    <div
+      className={`wheel-stage ${cleanOverlay ? "wheel-stage-clean" : ""}`}
+      style={{ width: size, height: size, background: "transparent" }}
+    >
       <canvas
         ref={canvasRef}
         className="wheel-canvas"
+        style={{ background: "transparent" }}
         onClick={() => {
           if (interactive && !isSpinning) onRequestSpin?.();
         }}

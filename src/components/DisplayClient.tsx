@@ -28,9 +28,27 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
   useEffect(() => {
     document.documentElement.classList.toggle("overlay-mode", overlay);
     document.body.classList.toggle("overlay-mode", overlay);
+
+    // Force true transparency for TikTok Studio / OBS (kills leftover gradient plates)
+    const style = document.createElement("style");
+    style.setAttribute("data-overlay-transparency", "1");
+    style.textContent = overlay
+      ? `
+      html, body, body *, #__next, [data-overlay-root] {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+      }
+      body { margin: 0 !important; }
+      .wheel-stage, .wheel-canvas { background: transparent !important; filter: none !important; box-shadow: none !important; }
+    `
+      : "";
+    if (overlay) document.head.appendChild(style);
+
     return () => {
       document.documentElement.classList.remove("overlay-mode");
       document.body.classList.remove("overlay-mode");
+      document.querySelectorAll("[data-overlay-transparency]").forEach((n) => n.remove());
     };
   }, [overlay]);
 
@@ -93,7 +111,11 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
   }, [token]);
 
   return (
-    <div className={`display-shell ${overlay ? "overlay-mode" : ""}`}>
+    <div
+      data-overlay-root
+      className={`display-shell ${overlay ? "overlay-mode" : ""}`}
+      style={overlay ? { background: "transparent" } : undefined}
+    >
       {!overlay ? (
         <>
           <BrandHeader showBanner={false} />
@@ -112,6 +134,7 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
         spinVolume={wheel.spinVolume ?? 80}
         onSpinComplete={() => setShowWinner(true)}
         size={wheelSize}
+        cleanOverlay={overlay}
       />
 
       {!overlay ? (
