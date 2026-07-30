@@ -8,13 +8,15 @@ import {
   targetAngleForIndex,
 } from "@/lib/wheel-math";
 
+const wheelInclude = {
+  entries: { orderBy: { sortOrder: "asc" as const } },
+  winners: { orderBy: { createdAt: "desc" as const }, take: 25 },
+};
+
 export async function getOrCreateWheelForUser(userId: string) {
   const existing = await prisma.wheel.findFirst({
     where: { userId },
-    include: {
-      entries: { orderBy: { sortOrder: "asc" } },
-      winners: { orderBy: { createdAt: "desc" }, take: 25 },
-    },
+    include: wheelInclude,
   });
   if (existing) return existing;
 
@@ -23,11 +25,29 @@ export async function getOrCreateWheelForUser(userId: string) {
       userId,
       title: "Viewer Games",
     },
-    include: {
-      entries: { orderBy: { sortOrder: "asc" } },
-      winners: { orderBy: { createdAt: "desc" }, take: 25 },
-    },
+    include: wheelInclude,
   });
+}
+
+/** Single shared wheel for no-login / single-operator mode. */
+export async function getSharedWheel() {
+  const existing = await prisma.wheel.findFirst({
+    orderBy: { createdAt: "asc" },
+    include: wheelInclude,
+  });
+  if (existing) return existing;
+
+  const operator =
+    (await prisma.user.findFirst({ orderBy: { createdAt: "asc" } })) ??
+    (await prisma.user.create({
+      data: {
+        email: "operator@local",
+        passwordHash: "disabled",
+        name: "Operator",
+      },
+    }));
+
+  return getOrCreateWheelForUser(operator.id);
 }
 
 export function serializeWheel(

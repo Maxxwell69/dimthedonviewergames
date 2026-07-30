@@ -1,17 +1,11 @@
-import { auth } from "@/lib/auth";
-import { getOrCreateWheelForUser } from "@/lib/wheel-service";
+import { getSharedWheel } from "@/lib/wheel-service";
 import { subscribe, wheelChannel } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
-  const wheel = await getOrCreateWheelForUser(session.user.id);
+  const wheel = await getSharedWheel();
   const encoder = new TextEncoder();
   let cleanup: () => void = () => {};
   let heartbeat: ReturnType<typeof setInterval> | undefined;

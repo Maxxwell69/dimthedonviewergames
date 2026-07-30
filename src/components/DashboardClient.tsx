@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { signOut } from "next-auth/react";
 import { BrandHeader } from "@/components/BrandHeader";
 import { DonWheel } from "@/components/DonWheel";
 import { WinnerOverlay } from "@/components/WinnerOverlay";
@@ -9,7 +8,6 @@ import type { WheelDTO } from "@/lib/types";
 
 type DashboardClientProps = {
   initialWheel: WheelDTO;
-  userEmail: string;
 };
 
 async function readJson<T>(res: Response): Promise<T> {
@@ -18,7 +16,7 @@ async function readJson<T>(res: Response): Promise<T> {
   return data as T;
 }
 
-export function DashboardClient({ initialWheel, userEmail }: DashboardClientProps) {
+export function DashboardClient({ initialWheel }: DashboardClientProps) {
   const [wheel, setWheel] = useState(initialWheel);
   const [entriesText, setEntriesText] = useState(initialWheel.entriesText ?? "");
   const [busy, setBusy] = useState(false);
@@ -182,12 +180,6 @@ export function DashboardClient({ initialWheel, userEmail }: DashboardClientProp
     <div className="dash-shell">
       <div className="dash-top">
         <BrandHeader compact showBanner={false} />
-        <div className="dash-user">
-          <span>{userEmail}</span>
-          <button type="button" className="btn ghost" onClick={() => signOut({ callbackUrl: "/login" })}>
-            Sign out
-          </button>
-        </div>
       </div>
 
       <div className="dash-grid">

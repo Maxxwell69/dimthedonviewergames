@@ -1,23 +1,17 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import {
   clearWheelEntries,
   dismissWinner,
-  getOrCreateWheelForUser,
+  getSharedWheel,
   regenerateDisplayToken,
   regenerateWebhookSecret,
   shuffleWheelEntries,
 } from "@/lib/wheel-service";
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = await req.json();
   const action = body.action as string;
-  const wheel = await getOrCreateWheelForUser(session.user.id);
+  const wheel = await getSharedWheel();
 
   try {
     switch (action) {

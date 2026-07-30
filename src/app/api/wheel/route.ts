@@ -1,24 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { getOrCreateWheelForUser, serializeWheel, updateWheelSettings } from "@/lib/wheel-service";
+import { getSharedWheel, serializeWheel, updateWheelSettings } from "@/lib/wheel-service";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const wheel = await getOrCreateWheelForUser(session.user.id);
+  const wheel = await getSharedWheel();
   return NextResponse.json({ wheel: serializeWheel(wheel) });
 }
 
 export async function PATCH(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const wheel = await getOrCreateWheelForUser(session.user.id);
+  const wheel = await getSharedWheel();
   const body = await req.json();
 
   const updated = await updateWheelSettings(wheel.id, {
