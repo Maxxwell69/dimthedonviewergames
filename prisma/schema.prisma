@@ -18,12 +18,14 @@ model User {
 }
 
 model Wheel {
-  id              String    @id @default(cuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title           String    @default("Viewer Games")
-  displayToken    String    @unique @default(cuid())
-  webhookSecret   String    @unique @default(cuid())
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title             String    @default("Viewer Games")
+  description       String    @default("")
+  isActive          Boolean   @default(true)
+  displayToken      String    @unique @default(cuid())
+  webhookSecret     String    @unique @default(cuid())
   removeOnWin       Boolean   @default(true)
   spinDurationMs    Int       @default(8000)
   soundEnabled      Boolean   @default(true)
@@ -31,19 +33,24 @@ model Wheel {
   spinVolume        Int       @default(80)
   celebrateVolume   Int       @default(95)
   allowDuplicates   Boolean   @default(false)
-  isSpinning      Boolean   @default(false)
-  spinStartedAt   DateTime?
-  spinEndsAt      DateTime?
-  spinTargetAngle Float?
-  currentWinner   String?
-  lastWinnerAt    DateTime?
-  entriesText     String    @default("")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  entries         Entry[]
-  winners         Winner[]
+  colorPrimary      String    @default("#5c0a14")
+  colorSecondary    String    @default("#0a0a0a")
+  colorAccent       String    @default("#c9a24d")
+  hubImageUrl       String?   @db.Text
+  isSpinning        Boolean   @default(false)
+  spinStartedAt     DateTime?
+  spinEndsAt        DateTime?
+  spinTargetAngle   Float?
+  currentWinner     String?
+  lastWinnerAt      DateTime?
+  entriesText       String    @default("")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  entries           Entry[]
+  winners           Winner[]
 
   @@index([userId])
+  @@index([userId, isActive])
 }
 
 model Entry {

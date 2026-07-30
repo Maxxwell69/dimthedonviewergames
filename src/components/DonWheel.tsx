@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useWheelSpinSound } from "@/hooks/useWheelSpinSound";
+import { DEFAULT_WHEEL_COLORS } from "@/lib/types";
 
 export type WheelEntry = {
   id: string;
@@ -23,15 +24,22 @@ type DonWheelProps = {
   onRequestSpin?: () => void;
   /** Skip soft glows that read as a shaded box in OBS / TikTok Studio overlays. */
   cleanOverlay?: boolean;
+  colorPrimary?: string;
+  colorSecondary?: string;
+  colorAccent?: string;
+  hubImageUrl?: string | null;
 };
-
-const MAROON = "#5c0a14";
-const BLACK = "#0a0a0a";
-const GOLD = "#c9a24d";
-const GOLD_LIGHT = "#e8d08a";
 
 function easeOutCubic(t: number) {
   return 1 - Math.pow(1 - t, 3);
+}
+
+function lighten(hex: string, amount = 0.25) {
+  const raw = hex.replace("#", "");
+  if (raw.length !== 6) return hex;
+  const nums = [0, 2, 4].map((i) => parseInt(raw.slice(i, i + 2), 16));
+  const mixed = nums.map((n) => Math.min(255, Math.round(n + (255 - n) * amount)));
+  return `#${mixed.map((n) => n.toString(16).padStart(2, "0")).join("")}`;
 }
 
 export function DonWheel({
@@ -47,29 +55,42 @@ export function DonWheel({
   interactive = false,
   onRequestSpin,
   cleanOverlay = false,
+  colorPrimary = DEFAULT_WHEEL_COLORS.colorPrimary,
+  colorSecondary = DEFAULT_WHEEL_COLORS.colorSecondary,
+  colorAccent = DEFAULT_WHEEL_COLORS.colorAccent,
+  hubImageUrl = null,
 }: DonWheelProps) {
   const [angle, setAngle] = useState(0);
   const [hubLogo, setHubLogo] = useState<HTMLImageElement | null>(null);
   const completedForSpin = useRef<string | null>(null);
+  const lastSpinTap = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useWheelSpinSound(isSpinning, spinStartedAt, soundEnabled, spinVolume);
 
   const segments = useMemo(() => {
     if (!entries.length) {
-      return [{ label: "WAITING", weight: 1, color: MAROON }];
+      return [{ label: "WAITING", weight: 1, color: colorPrimary }];
     }
     return entries.map((entry, index) => ({
       ...entry,
-      color: index % 2 === 0 ? MAROON : BLACK,
+      color: index % 2 === 0 ? colorPrimary : colorSecondary,
     }));
-  }, [entries]);
+  }, [entries, colorPrimary, colorSecondary]);
 
   useEffect(() => {
     const img = new Image();
-    img.src = "/dom-the-don-d.png";
+    img.crossOrigin = "anonymous";
+    img.src = hubImageUrl || "/dom-the-don-d.png";
     img.onload = () => setHubLogo(img);
-  }, []);
+    img.onerror = () => {
+      if (hubImageUrl) {
+        const fallback = new Image();
+        fallback.src = "/dom-the-don-d.png";
+        fallback.onload = () => setHubLogo(fallback);
+      }
+    };
+  }, [hubImageUrl]);
 
   useEffect(() => {
     if (!isSpinning || targetAngle == null || !spinStartedAt) return;
@@ -117,13 +138,13 @@ export function DonWheel({
     const cx = size / 2;
     const cy = size / 2;
     const radius = size * 0.42;
+    const accentLight = lighten(colorAccent, 0.35);
 
     ctx.clearRect(0, 0, size, size);
 
     if (!cleanOverlay) {
-      // Outer red glow (skipped in overlay — reads as a shaded box in TikTok Studio)
       const glow = ctx.createRadialGradient(cx, cy, radius * 0.7, cx, cy, radius * 1.25);
-      glow.addColorStop(0, "rgba(180, 20, 30, 0.35)");
+      glow.addColorStop(0, `${colorPrimary}59`);
       glow.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = glow;
       ctx.beginPath();
@@ -131,12 +152,11 @@ export function DonWheel({
       ctx.fill();
     }
 
-    // Outer studded rim
     ctx.beginPath();
     ctx.arc(cx, cy, radius + 18, 0, Math.PI * 2);
     const rimGrad = ctx.createLinearGradient(0, cy - radius, 0, cy + radius);
     rimGrad.addColorStop(0, "#3a2a12");
-    rimGrad.addColorStop(0.5, GOLD);
+    rimGrad.addColorStop(0.5, colorAccent);
     rimGrad.addColorStop(1, "#2a1c0a");
     ctx.fillStyle = rimGrad;
     ctx.fill();
@@ -160,15 +180,13 @@ export function DonWheel({
       ctx.fillStyle = segment.color;
       ctx.fill();
 
-      // Gold divider
-      ctx.strokeStyle = GOLD;
+      ctx.strokeStyle = colorAccent;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(cx + Math.cos(startAngle) * radius, cy + Math.sin(startAngle) * radius);
       ctx.stroke();
 
-      // Label
       const mid = startAngle + sweep / 2;
       ctx.save();
       ctx.translate(cx, cy);
@@ -184,7 +202,6 @@ export function DonWheel({
       startAngle = endAngle;
     });
 
-    // Rivets
     const rivets = 24;
     for (let i = 0; i < rivets; i++) {
       const a = (i / rivets) * Math.PI * 2;
@@ -192,19 +209,18 @@ export function DonWheel({
       const ry = cy + Math.sin(a) * (radius + 11);
       ctx.beginPath();
       ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = GOLD_LIGHT;
+      ctx.fillStyle = accentLight;
       ctx.fill();
       ctx.strokeStyle = "#5a3d12";
       ctx.lineWidth = 1;
       ctx.stroke();
     }
 
-    // Center hub with Dom the Don D logo
     const hubR = radius * 0.22;
     if (!cleanOverlay) {
       ctx.beginPath();
       ctx.arc(cx, cy, hubR + 8, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(180,20,30,0.75)";
+      ctx.fillStyle = `${colorPrimary}bf`;
       ctx.fill();
     }
 
@@ -216,7 +232,7 @@ export function DonWheel({
     ctx.fillStyle = hubGrad;
     ctx.fill();
     ctx.lineWidth = 4;
-    ctx.strokeStyle = GOLD;
+    ctx.strokeStyle = colorAccent;
     ctx.stroke();
 
     if (hubLogo) {
@@ -228,25 +244,34 @@ export function DonWheel({
       ctx.drawImage(hubLogo, cx - logoSize / 2, cy - logoSize / 2, logoSize, logoSize);
       ctx.restore();
     } else {
-      ctx.fillStyle = GOLD_LIGHT;
+      ctx.fillStyle = accentLight;
       ctx.font = `800 ${hubR * 0.95}px Georgia, "Times New Roman", serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("D", cx, cy + 2);
     }
-  }, [angle, segments, size, hubLogo, cleanOverlay]);
+  }, [angle, segments, size, hubLogo, cleanOverlay, colorPrimary, colorAccent]);
+
+  const requestSpin = () => {
+    if (!interactive || isSpinning) return;
+    const now = Date.now();
+    if (now - lastSpinTap.current < 450) return;
+    lastSpinTap.current = now;
+    onRequestSpin?.();
+  };
 
   return (
     <div
-      className={`wheel-stage ${cleanOverlay ? "wheel-stage-clean" : ""}`}
+      className={`wheel-stage ${cleanOverlay ? "wheel-stage-clean" : ""} ${interactive ? "wheel-stage-interactive" : ""}`}
       style={{ width: size, height: size, background: "transparent" }}
     >
       <canvas
         ref={canvasRef}
         className="wheel-canvas"
-        style={{ background: "transparent" }}
-        onClick={() => {
-          if (interactive && !isSpinning) onRequestSpin?.();
+        style={{ background: "transparent", touchAction: interactive ? "manipulation" : undefined }}
+        onClick={requestSpin}
+        onPointerUp={(e) => {
+          if (e.pointerType === "touch" || e.pointerType === "pen") requestSpin();
         }}
         role={interactive ? "button" : undefined}
         aria-label={interactive ? "Spin the wheel" : "Wheel"}

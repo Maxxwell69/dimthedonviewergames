@@ -7,30 +7,97 @@ import {
   shuffleArray,
   targetAngleForIndex,
 } from "@/lib/wheel-math";
-import { clampVolume } from "@/lib/types";
+import {
+  clampVolume,
+  DEFAULT_WHEEL_COLORS,
+  normalizeHexColor,
+  type WheelSummaryDTO,
+} from "@/lib/types";
 
 const wheelInclude = {
   entries: { orderBy: { sortOrder: "asc" as const } },
   winners: { orderBy: { createdAt: "desc" as const }, take: 25 },
 };
 
-export async function getOrCreateWheelForUser(userId: string) {
-  const existing = await prisma.wheel.findFirst({
-    where: { userId },
-    include: wheelInclude,
-  });
-  if (existing) return existing;
+const OPERATOR_EMAIL = "operator@local";
 
+export async function createWheelForUser(
+  userId: string,
+  input?: { title?: string; description?: string },
+) {
   return prisma.wheel.create({
     data: {
       userId,
-      title: "Viewer Games",
+      title: input?.title?.trim() || "Viewer Games",
+      description: input?.description?.trim() || "",
+      ...DEFAULT_WHEEL_COLORS,
     },
     include: wheelInclude,
   });
 }
 
-/** Single shared wheel for no-login / single-operator mode. */
+/** Claim legacy operator wheels, or create a starter wheel. */
+export async function ensureUserHasWheels(userId: string) {
+  const existing = await prisma.wheel.count({ where: { userId } });
+  if (existing > 0) return;
+
+  const operator = await prisma.user.findUnique({ where: { email: OPERATOR_EMAIL } });
+  if (operator && operator.id !== userId) {
+    const moved = await prisma.wheel.updateMany({
+      where: { userId: operator.id },
+      data: { userId },
+    });
+    if (moved.count > 0) return;
+  }
+
+  await createWheelForUser(userId, {
+    title: "Viewer Games",
+    description: "Main giveaway wheel",
+  });
+}
+
+export async function listWheelsForUser(userId: string): Promise<WheelSummaryDTO[]> {
+  await ensureUserHasWheels(userId);
+  const wheels = await prisma.wheel.findMany({
+    where: { userId },
+    orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
+    include: { _count: { select: { entries: true } } },
+  });
+
+  return wheels.map((wheel) => ({
+    id: wheel.id,
+    title: wheel.title,
+    description: wheel.description,
+    isActive: wheel.isActive,
+    entryCount: wheel._count.entries,
+    updatedAt: wheel.updatedAt.toISOString(),
+    colorPrimary: wheel.colorPrimary,
+    colorSecondary: wheel.colorSecondary,
+    colorAccent: wheel.colorAccent,
+  }));
+}
+
+export async function getWheelForUser(userId: string, wheelId: string) {
+  const wheel = await prisma.wheel.findFirst({
+    where: { id: wheelId, userId },
+    include: wheelInclude,
+  });
+  if (!wheel) return null;
+  return wheel;
+}
+
+export async function getOrCreateWheelForUser(userId: string) {
+  await ensureUserHasWheels(userId);
+  const existing = await prisma.wheel.findFirst({
+    where: { userId },
+    orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
+    include: wheelInclude,
+  });
+  if (existing) return existing;
+  return createWheelForUser(userId);
+}
+
+/** @deprecated Prefer auth + getWheelForUser. Kept for legacy bootstrap. */
 export async function getSharedWheel() {
   const existing = await prisma.wheel.findFirst({
     orderBy: { createdAt: "asc" },
@@ -42,7 +109,7 @@ export async function getSharedWheel() {
     (await prisma.user.findFirst({ orderBy: { createdAt: "asc" } })) ??
     (await prisma.user.create({
       data: {
-        email: "operator@local",
+        email: OPERATOR_EMAIL,
         passwordHash: "disabled",
         name: "Operator",
       },
@@ -57,6 +124,8 @@ export function serializeWheel(
   return {
     id: wheel.id,
     title: wheel.title,
+    description: wheel.description ?? "",
+    isActive: wheel.isActive ?? true,
     displayToken: wheel.displayToken,
     webhookSecret: wheel.webhookSecret,
     removeOnWin: wheel.removeOnWin,
@@ -66,6 +135,10 @@ export function serializeWheel(
     spinVolume: wheel.spinVolume,
     celebrateVolume: wheel.celebrateVolume,
     allowDuplicates: wheel.allowDuplicates,
+    colorPrimary: wheel.colorPrimary || DEFAULT_WHEEL_COLORS.colorPrimary,
+    colorSecondary: wheel.colorSecondary || DEFAULT_WHEEL_COLORS.colorSecondary,
+    colorAccent: wheel.colorAccent || DEFAULT_WHEEL_COLORS.colorAccent,
+    hubImageUrl: wheel.hubImageUrl ?? null,
     isSpinning: wheel.isSpinning,
     spinStartedAt: wheel.spinStartedAt?.toISOString() ?? null,
     spinEndsAt: wheel.spinEndsAt?.toISOString() ?? null,
@@ -104,6 +177,10 @@ export function serializeDisplayWheel(
     celebrateEnabled: full.celebrateEnabled,
     spinVolume: full.spinVolume,
     celebrateVolume: full.celebrateVolume,
+    colorPrimary: full.colorPrimary,
+    colorSecondary: full.colorSecondary,
+    colorAccent: full.colorAccent,
+    hubImageUrl: full.hubImageUrl,
     isSpinning: full.isSpinning,
     spinStartedAt: full.spinStartedAt,
     spinEndsAt: full.spinEndsAt,
@@ -114,6 +191,14 @@ export function serializeDisplayWheel(
     winners: full.winners,
     updatedAt: full.updatedAt,
   };
+}
+
+export async function deleteWheelForUser(userId: string, wheelId: string) {
+  const count = await prisma.wheel.count({ where: { userId } });
+  if (count <= 1) throw new Error("Keep at least one wheel");
+  const wheel = await prisma.wheel.findFirst({ where: { id: wheelId, userId } });
+  if (!wheel) throw new Error("Wheel not found");
+  await prisma.wheel.delete({ where: { id: wheelId } });
 }
 
 async function syncEntriesFromText(wheelId: string, text: string) {
@@ -153,6 +238,8 @@ export async function updateWheelSettings(
   wheelId: string,
   data: {
     title?: string;
+    description?: string;
+    isActive?: boolean;
     removeOnWin?: boolean;
     spinDurationMs?: number;
     soundEnabled?: boolean;
@@ -160,6 +247,10 @@ export async function updateWheelSettings(
     spinVolume?: number;
     celebrateVolume?: number;
     allowDuplicates?: boolean;
+    colorPrimary?: string;
+    colorSecondary?: string;
+    colorAccent?: string;
+    hubImageUrl?: string | null;
     entriesText?: string;
   },
 ) {
@@ -171,6 +262,8 @@ export async function updateWheelSettings(
     where: { id: wheelId },
     data: {
       title: data.title,
+      description: typeof data.description === "string" ? data.description : undefined,
+      isActive: typeof data.isActive === "boolean" ? data.isActive : undefined,
       removeOnWin: data.removeOnWin,
       spinDurationMs: data.spinDurationMs,
       soundEnabled: data.soundEnabled,
@@ -182,6 +275,24 @@ export async function updateWheelSettings(
           ? clampVolume(data.celebrateVolume)
           : undefined,
       allowDuplicates: data.allowDuplicates,
+      colorPrimary:
+        typeof data.colorPrimary === "string"
+          ? normalizeHexColor(data.colorPrimary, DEFAULT_WHEEL_COLORS.colorPrimary)
+          : undefined,
+      colorSecondary:
+        typeof data.colorSecondary === "string"
+          ? normalizeHexColor(data.colorSecondary, DEFAULT_WHEEL_COLORS.colorSecondary)
+          : undefined,
+      colorAccent:
+        typeof data.colorAccent === "string"
+          ? normalizeHexColor(data.colorAccent, DEFAULT_WHEEL_COLORS.colorAccent)
+          : undefined,
+      hubImageUrl:
+        data.hubImageUrl === null
+          ? null
+          : typeof data.hubImageUrl === "string"
+            ? data.hubImageUrl
+            : undefined,
     },
     include: {
       entries: { orderBy: { sortOrder: "asc" } },

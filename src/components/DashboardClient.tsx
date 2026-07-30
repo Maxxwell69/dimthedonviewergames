@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BrandHeader } from "@/components/BrandHeader";
 import { DonWheel } from "@/components/DonWheel";
 import { WinnerOverlay } from "@/components/WinnerOverlay";
-import type { WheelDTO } from "@/lib/types";
+import Link from "next/link";
+import { DEFAULT_WHEEL_COLORS, type WheelDTO } from "@/lib/types";
 
 type DashboardClientProps = {
   initialWheel: WheelDTO;
@@ -16,9 +17,38 @@ async function readJson<T>(res: Response): Promise<T> {
   return data as T;
 }
 
+function fileToHubDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read image"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const max = 256;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas unavailable"));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.onerror = () => reject(new Error("Invalid image"));
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export function DashboardClient({ initialWheel }: DashboardClientProps) {
+  const wheelId = initialWheel.id;
   const [wheel, setWheel] = useState(initialWheel);
   const [entriesText, setEntriesText] = useState(initialWheel.entriesText ?? "");
+  const [description, setDescription] = useState(initialWheel.description ?? "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
@@ -35,7 +65,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
   }, []);
 
   useEffect(() => {
-    const es = new EventSource("/api/wheel/stream");
+    const es = new EventSource(`/api/wheels/${wheelId}/stream`);
     es.addEventListener("wheel", (event) => {
       try {
         const payload = JSON.parse((event as MessageEvent).data) as {
@@ -47,6 +77,9 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
         if (typeof payload.wheel.entriesText === "string") {
           setEntriesText(payload.wheel.entriesText);
         }
+        if (typeof payload.wheel.description === "string") {
+          setDescription(payload.wheel.description);
+        }
         if (payload.type === "enter" && payload.label) {
           setMessage(`${payload.label} entered the wheel`);
         }
@@ -57,18 +90,21 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
       }
     });
     return () => es.close();
-  }, []);
+  }, [wheelId]);
 
   // Polling fallback for Railway multi-instance / SSE gaps
   useEffect(() => {
     const id = setInterval(async () => {
       try {
-        const res = await fetch("/api/wheel", { cache: "no-store" });
+        const res = await fetch(`/api/wheels/${wheelId}`, { cache: "no-store" });
         const data = await readJson<{ wheel: WheelDTO }>(res);
         setWheel((prev) => {
           if (prev.updatedAt === data.wheel.updatedAt) return prev;
           if (typeof data.wheel.entriesText === "string") {
             setEntriesText(data.wheel.entriesText);
+          }
+          if (typeof data.wheel.description === "string") {
+            setDescription(data.wheel.description);
           }
           if (data.wheel.currentWinner && !data.wheel.isSpinning) setShowWinner(true);
           return data.wheel;
@@ -78,7 +114,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
       }
     }, 2500);
     return () => clearInterval(id);
-  }, []);
+  }, [wheelId]);
 
   const displayUrl = useMemo(
     () => (origin && wheel.displayToken ? `${origin}/display/${wheel.displayToken}` : ""),
@@ -102,7 +138,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
     setBusy(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/wheel", {
+      const res = await fetch(`/api/wheels/${wheelId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entriesText }),
@@ -116,30 +152,33 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
     } finally {
       setBusy(false);
     }
-  }, [entriesText]);
+  }, [entriesText, wheelId]);
 
   const patchSettings = useCallback(async (patch: Partial<WheelDTO>) => {
     setBusy(true);
     try {
-      const res = await fetch("/api/wheel", {
+      const res = await fetch(`/api/wheels/${wheelId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
       const data = await readJson<{ wheel: WheelDTO }>(res);
       setWheel(data.wheel);
+      if (typeof data.wheel.description === "string") {
+        setDescription(data.wheel.description);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Update failed");
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [wheelId]);
 
   const runAction = useCallback(async (action: string, extra?: Record<string, unknown>) => {
     setBusy(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/wheel/actions", {
+      const res = await fetch(`/api/wheels/${wheelId}/actions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ...extra }),
@@ -167,7 +206,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [wheelId]);
 
   const testWebhookEnter = useCallback(async () => {
     const username = testUsername.trim() || "webhook_test";
@@ -202,7 +241,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
           setMessage("Webhook HIT");
         }
         // Refresh wheel from server so the entry list updates immediately
-        const wheelRes = await fetch("/api/wheel", { cache: "no-store" });
+        const wheelRes = await fetch(`/api/wheels/${wheelId}`, { cache: "no-store" });
         const wheelData = await readJson<{ wheel: WheelDTO }>(wheelRes);
         setWheel(wheelData.wheel);
         if (typeof wheelData.wheel.entriesText === "string") {
@@ -222,14 +261,14 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
     }
     // Fallback if origin/URL not ready yet
     await runAction("testEnter", { username });
-  }, [testUsername, webhookUrl, runAction]);
+  }, [testUsername, webhookUrl, runAction, wheelId]);
 
   const spin = useCallback(async () => {
     setBusy(true);
     setMessage(null);
     setShowWinner(false);
     try {
-      const res = await fetch("/api/wheel/spin", { method: "POST" });
+      const res = await fetch(`/api/wheels/${wheelId}/spin`, { method: "POST" });
       const data = await readJson<{ wheel: WheelDTO }>(res);
       setWheel(data.wheel);
     } catch (error) {
@@ -237,7 +276,20 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [wheelId]);
+
+  const onHubImage = async (file: File | null) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const hubImageUrl = await fileToHubDataUrl(file);
+      await patchSettings({ hubImageUrl });
+      setMessage("Center image updated");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Image upload failed");
+      setBusy(false);
+    }
+  };
 
   const copy = async (value: string, label: string) => {
     try {
@@ -252,6 +304,9 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
     <div className="dash-shell">
       <div className="dash-top">
         <BrandHeader compact showBanner={false} />
+        <Link className="btn ghost" href="/dashboard">
+          All wheels
+        </Link>
       </div>
 
       <div className="dash-grid">
@@ -272,6 +327,16 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
               {wheel.isSpinning ? "Spinning…" : "Spin"}
             </button>
           </div>
+          <label className="field" style={{ marginBottom: "0.75rem" }}>
+            Short description
+            <input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onBlur={() => patchSettings({ description })}
+              placeholder="What this wheel is for"
+              maxLength={160}
+            />
+          </label>
 
           <DonWheel
             entries={wheel.entries}
@@ -285,6 +350,10 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
             onRequestSpin={spin}
             onSpinComplete={() => setShowWinner(true)}
             size={wheelSize}
+            colorPrimary={wheel.colorPrimary || DEFAULT_WHEEL_COLORS.colorPrimary}
+            colorSecondary={wheel.colorSecondary || DEFAULT_WHEEL_COLORS.colorSecondary}
+            colorAccent={wheel.colorAccent || DEFAULT_WHEEL_COLORS.colorAccent}
+            hubImageUrl={wheel.hubImageUrl}
           />
 
           <WinnerOverlay
@@ -325,6 +394,79 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
               <code>!enter</code> via TikFinity.
             </p>
             <p className="count">{wheel.entries.length} on the wheel</p>
+          </section>
+
+          <section className="panel">
+            <h2>Design your wheel</h2>
+            <div className="design-grid">
+              <label className="field">
+                Primary color
+                <input
+                  type="color"
+                  value={wheel.colorPrimary || DEFAULT_WHEEL_COLORS.colorPrimary}
+                  onChange={(e) =>
+                    setWheel((w) => ({ ...w, colorPrimary: e.target.value }))
+                  }
+                  onBlur={(e) => patchSettings({ colorPrimary: e.target.value })}
+                />
+              </label>
+              <label className="field">
+                Secondary color
+                <input
+                  type="color"
+                  value={wheel.colorSecondary || DEFAULT_WHEEL_COLORS.colorSecondary}
+                  onChange={(e) =>
+                    setWheel((w) => ({ ...w, colorSecondary: e.target.value }))
+                  }
+                  onBlur={(e) => patchSettings({ colorSecondary: e.target.value })}
+                />
+              </label>
+              <label className="field">
+                Accent / rim
+                <input
+                  type="color"
+                  value={wheel.colorAccent || DEFAULT_WHEEL_COLORS.colorAccent}
+                  onChange={(e) =>
+                    setWheel((w) => ({ ...w, colorAccent: e.target.value }))
+                  }
+                  onBlur={(e) => patchSettings({ colorAccent: e.target.value })}
+                />
+              </label>
+            </div>
+            <label className="field">
+              Center image
+              <input
+                type="file"
+                accept="image/*"
+                disabled={busy}
+                onChange={(e) => onHubImage(e.target.files?.[0] ?? null)}
+              />
+            </label>
+            <div className="btn-row">
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={busy}
+                onClick={() =>
+                  patchSettings({
+                    colorPrimary: DEFAULT_WHEEL_COLORS.colorPrimary,
+                    colorSecondary: DEFAULT_WHEEL_COLORS.colorSecondary,
+                    colorAccent: DEFAULT_WHEEL_COLORS.colorAccent,
+                    hubImageUrl: null,
+                  })
+                }
+              >
+                Reset design
+              </button>
+            </div>
+            <label className="check" style={{ marginTop: "0.85rem" }}>
+              <input
+                type="checkbox"
+                checked={wheel.isActive ?? true}
+                onChange={(e) => patchSettings({ isActive: e.target.checked })}
+              />
+              Active on dashboard
+            </label>
           </section>
 
           <section className="panel">

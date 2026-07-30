@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { BrandHeader } from "@/components/BrandHeader";
 import { DonWheel } from "@/components/DonWheel";
 import { WinnerOverlay } from "@/components/WinnerOverlay";
-import type { WheelDTO } from "@/lib/types";
+import { DEFAULT_WHEEL_COLORS, type WheelDTO } from "@/lib/types";
 
 type DisplayClientProps = {
   token: string;
@@ -31,7 +31,6 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
     document.documentElement.classList.toggle("overlay-mode", overlay);
     document.body.classList.toggle("overlay-mode", overlay);
 
-    // Force true transparency for TikTok Studio / OBS (kills leftover gradient plates)
     const style = document.createElement("style");
     style.setAttribute("data-overlay-transparency", "1");
     style.textContent = overlay
@@ -162,10 +161,14 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
         soundEnabled={wheel.soundEnabled}
         spinVolume={wheel.spinVolume ?? 80}
         onSpinComplete={() => setShowWinner(true)}
-        onRequestSpin={overlay ? undefined : spin}
-        interactive={!overlay}
+        onRequestSpin={spin}
+        interactive
         size={wheelSize}
         cleanOverlay={overlay}
+        colorPrimary={wheel.colorPrimary || DEFAULT_WHEEL_COLORS.colorPrimary}
+        colorSecondary={wheel.colorSecondary || DEFAULT_WHEEL_COLORS.colorSecondary}
+        colorAccent={wheel.colorAccent || DEFAULT_WHEEL_COLORS.colorAccent}
+        hubImageUrl={wheel.hubImageUrl}
       />
 
       {!overlay ? (

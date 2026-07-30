@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { createWheelForUser, ensureUserHasWheels } from "@/lib/wheel-service";
 
 const schema = z.object({
   email: z.string().email(),
@@ -11,14 +12,6 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const userCount = await prisma.user.count();
-    if (userCount > 0) {
-      return NextResponse.json(
-        { error: "Registration is closed. This app is single-operator only." },
-        { status: 403 },
-      );
-    }
-
     const body = await req.json();
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
@@ -26,19 +19,28 @@ export async function POST(req: Request) {
     }
 
     const email = parsed.data.email.toLowerCase();
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return NextResponse.json({ error: "An account with that email already exists" }, { status: 409 });
+    }
+
     const passwordHash = await bcrypt.hash(parsed.data.password, 12);
     const user = await prisma.user.create({
       data: {
         email,
         passwordHash,
         name: parsed.data.name ?? email.split("@")[0],
-        wheels: {
-          create: {
-            title: "Viewer Games",
-          },
-        },
       },
     });
+
+    await ensureUserHasWheels(user.id);
+    const wheelCount = await prisma.wheel.count({ where: { userId: user.id } });
+    if (wheelCount === 0) {
+      await createWheelForUser(user.id, {
+        title: "Viewer Games",
+        description: "Main giveaway wheel",
+      });
+    }
 
     return NextResponse.json({
       ok: true,
