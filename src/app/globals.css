@@ -50,11 +50,14 @@ pre {
 }
 
 .brand-logo {
+  display: block;
   width: min(460px, 88vw);
   height: auto;
   object-fit: contain;
-  background: transparent;
-  filter: drop-shadow(0 0 28px rgba(180, 30, 40, 0.45));
+  background: none !important;
+  background-color: transparent !important;
+  mix-blend-mode: normal;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
 }
 
 .brand-header.compact .brand-logo {
