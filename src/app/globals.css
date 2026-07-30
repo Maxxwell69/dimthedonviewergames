@@ -49,57 +49,14 @@ pre {
   text-align: center;
 }
 
-.brand-wordmark {
-  display: grid;
-  justify-items: center;
-  gap: 0.15rem;
+.brand-logo {
+  width: min(420px, 82vw);
+  height: auto;
   filter: drop-shadow(0 0 28px rgba(180, 30, 40, 0.55));
 }
 
-.brand-dom {
-  font-family: Cinzel, Georgia, serif;
-  font-weight: 800;
-  font-size: clamp(2.6rem, 8vw, 4.4rem);
-  letter-spacing: 0.08em;
-  line-height: 0.95;
-  color: var(--gold-light);
-  background: linear-gradient(180deg, #f0d78a, #b8892d 55%, #6e4a12);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  text-shadow: none;
-  position: relative;
-}
-
-.hat-letter {
-  position: relative;
-  display: inline-block;
-}
-
-.hat-letter::before {
-  content: "";
-  position: absolute;
-  top: -0.22em;
-  left: 50%;
-  width: 0.85em;
-  height: 0.28em;
-  transform: translateX(-40%) rotate(-18deg);
-  background: #111;
-  border-radius: 40% 40% 10% 10%;
-  box-shadow: inset 0 -0.05em 0 var(--gold);
-}
-
-.brand-don {
-  font-family: Cinzel, Georgia, serif;
-  font-size: clamp(0.95rem, 2.8vw, 1.35rem);
-  letter-spacing: 0.35em;
-  color: #d7d0c4;
-  transform: skewX(-8deg);
-  text-shadow: 0 0 18px rgba(255, 255, 255, 0.15);
-}
-
-.brand-header.compact .brand-dom {
-  font-size: clamp(2rem, 7vw, 3.2rem);
+.brand-header.compact .brand-logo {
+  width: min(280px, 70vw);
 }
 
 .brand-banner {

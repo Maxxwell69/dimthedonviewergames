@@ -41,6 +41,7 @@ export function DonWheel({
   onRequestSpin,
 }: DonWheelProps) {
   const [angle, setAngle] = useState(0);
+  const [hubLogo, setHubLogo] = useState<HTMLImageElement | null>(null);
   const completedForSpin = useRef<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -53,6 +54,12 @@ export function DonWheel({
       color: index % 2 === 0 ? MAROON : BLACK,
     }));
   }, [entries]);
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/dom-the-don-d.png";
+    img.onload = () => setHubLogo(img);
+  }, []);
 
   useEffect(() => {
     if (!isSpinning || targetAngle == null || !spinStartedAt) return;
@@ -180,30 +187,40 @@ export function DonWheel({
       ctx.stroke();
     }
 
-    // Center hub
-    const hubR = radius * 0.18;
+    // Center hub with Dom the Don D logo
+    const hubR = radius * 0.22;
     ctx.beginPath();
-    ctx.arc(cx, cy, hubR + 6, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(180,20,30,0.7)";
+    ctx.arc(cx, cy, hubR + 8, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(180,20,30,0.75)";
     ctx.fill();
 
     const hubGrad = ctx.createRadialGradient(cx - 8, cy - 8, 4, cx, cy, hubR);
-    hubGrad.addColorStop(0, GOLD_LIGHT);
-    hubGrad.addColorStop(1, "#8a6418");
+    hubGrad.addColorStop(0, "#1a1208");
+    hubGrad.addColorStop(1, "#050303");
     ctx.beginPath();
     ctx.arc(cx, cy, hubR, 0, Math.PI * 2);
     ctx.fillStyle = hubGrad;
     ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "#2a1c0a";
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = GOLD;
     ctx.stroke();
 
-    ctx.fillStyle = "#1a1208";
-    ctx.font = `800 ${hubR * 0.95}px Georgia, "Times New Roman", serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("D", cx, cy + 2);
-  }, [angle, segments, size]);
+    if (hubLogo) {
+      const logoSize = hubR * 1.55;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, hubR - 3, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(hubLogo, cx - logoSize / 2, cy - logoSize / 2, logoSize, logoSize);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = GOLD_LIGHT;
+      ctx.font = `800 ${hubR * 0.95}px Georgia, "Times New Roman", serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("D", cx, cy + 2);
+    }
+  }, [angle, segments, size, hubLogo]);
 
   return (
     <div className="wheel-stage" style={{ width: size, height: size }}>

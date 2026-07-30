@@ -17,6 +17,10 @@ const body = Manrope({
 export const metadata: Metadata = {
   title: "Dom the Don · Viewer Games",
   description: "Wheel of Names-style viewer games with TikFinity !enter webhooks",
+  icons: {
+    icon: "/dom-the-don-d.png",
+    apple: "/dom-the-don-d.png",
+  },
 };
 
 export default function RootLayout({
