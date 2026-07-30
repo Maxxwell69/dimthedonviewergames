@@ -85,6 +85,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
         }
         if (payload.type === "spin") setShowWinner(false);
         if (payload.type === "winner") setShowWinner(true);
+        if (!payload.wheel.currentWinner) setShowWinner(false);
       } catch {
         // ignore malformed events
       }
@@ -107,6 +108,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
             setDescription(data.wheel.description);
           }
           if (data.wheel.currentWinner && !data.wheel.isSpinning) setShowWinner(true);
+          if (!data.wheel.currentWinner) setShowWinner(false);
           return data.wheel;
         });
       } catch {

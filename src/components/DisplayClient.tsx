@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BrandHeader } from "@/components/BrandHeader";
 import { DonWheel } from "@/components/DonWheel";
 import { WinnerOverlay } from "@/components/WinnerOverlay";
 import { DEFAULT_WHEEL_COLORS, type WheelDTO } from "@/lib/types";
+
+const OVERLAY_WINNER_MS = 10_000;
 
 type DisplayClientProps = {
   token: string;
@@ -26,6 +28,7 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
   const [wheelSize, setWheelSize] = useState(520);
   const [busy, setBusy] = useState(false);
   const [spinError, setSpinError] = useState<string | null>(null);
+  const clearedWinnerRef = useRef<string | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("overlay-mode", overlay);
@@ -93,8 +96,18 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
           wheel: WheelDTO;
         };
         setWheel(payload.wheel);
+        if (!payload.wheel.currentWinner) clearedWinnerRef.current = null;
         if (payload.type === "spin") setShowWinner(false);
-        if (payload.type === "winner") setShowWinner(true);
+        if (
+          payload.type === "winner" &&
+          payload.wheel.currentWinner &&
+          clearedWinnerRef.current !== payload.wheel.currentWinner
+        ) {
+          setShowWinner(true);
+        }
+        if (payload.type === "update" && !payload.wheel.currentWinner) {
+          setShowWinner(false);
+        }
       } catch {
         // ignore
       }
@@ -110,8 +123,15 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
         const data = (await res.json()) as { wheel: WheelDTO };
         setWheel((prev) => {
           if (prev.updatedAt === data.wheel.updatedAt) return prev;
-          if (data.wheel.currentWinner && !data.wheel.isSpinning) setShowWinner(true);
-          if (data.wheel.isSpinning) setShowWinner(false);
+          if (!data.wheel.currentWinner) clearedWinnerRef.current = null;
+          if (
+            data.wheel.currentWinner &&
+            !data.wheel.isSpinning &&
+            clearedWinnerRef.current !== data.wheel.currentWinner
+          ) {
+            setShowWinner(true);
+          }
+          if (data.wheel.isSpinning || !data.wheel.currentWinner) setShowWinner(false);
           return data.wheel;
         });
       } catch {
@@ -121,10 +141,33 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
     return () => clearInterval(id);
   }, [token]);
 
+  useEffect(() => {
+    if (!showWinner || !wheel.currentWinner || wheel.isSpinning) return;
+
+    const winnerLabel = wheel.currentWinner;
+    const timer = window.setTimeout(() => {
+      clearedWinnerRef.current = winnerLabel;
+      setShowWinner(false);
+      void (async () => {
+        try {
+          const res = await fetch(`/api/display/${token}/dismiss`, { method: "POST" });
+          if (!res.ok) return;
+          const data = (await res.json()) as { wheel?: WheelDTO };
+          if (data.wheel) setWheel(data.wheel);
+        } catch {
+          // ignore — local overlay already hidden
+        }
+      })();
+    }, OVERLAY_WINNER_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [showWinner, wheel.currentWinner, wheel.isSpinning, token]);
+
   const spin = useCallback(async () => {
     if (busy || wheel.isSpinning || wheel.entries.length < 1) return;
     setBusy(true);
     setSpinError(null);
+    clearedWinnerRef.current = null;
     setShowWinner(false);
     try {
       const res = await fetch(`/api/display/${token}/spin`, { method: "POST" });
