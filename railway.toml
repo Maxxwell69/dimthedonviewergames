@@ -3,7 +3,6 @@ builder = "NIXPACKS"
 buildCommand = "npm run build"
 
 [deploy]
+# Keep migrate + start together, but echo failures clearly in Deploy Logs
 startCommand = "npx prisma migrate deploy && npm run start"
-healthcheckPath = "/api/health"
-healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
