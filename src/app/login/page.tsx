@@ -20,13 +20,22 @@ export default function LoginPage() {
       email,
       password,
       redirect: false,
+      callbackUrl: "/dashboard",
     });
     setLoading(false);
     if (result?.error) {
-      setError("Invalid email or password");
+      setError(
+        result.error === "Configuration"
+          ? "Login is misconfigured. Check AUTH_SECRET / AUTH_URL on Railway."
+          : "Invalid email or password",
+      );
       return;
     }
-    router.push("/dashboard");
+    if (result?.url) {
+      router.push(result.url);
+    } else {
+      router.push("/dashboard");
+    }
     router.refresh();
   }
 

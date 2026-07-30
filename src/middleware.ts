@@ -3,19 +3,28 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 export async function middleware(req: NextRequest) {
-  const token = await getToken({
-    req,
-    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-  });
-
-  const isAuthed = Boolean(token);
   const path = req.nextUrl.pathname;
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
 
-  if (path.startsWith("/dashboard") && !isAuthed) {
+  if (path === "/register") {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (path === "/register") {
+  if (!secret) {
+    if (path.startsWith("/dashboard")) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+    return NextResponse.next();
+  }
+
+  const token = await getToken({
+    req,
+    secret,
+  });
+
+  const isAuthed = Boolean(token);
+
+  if (path.startsWith("/dashboard") && !isAuthed) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 

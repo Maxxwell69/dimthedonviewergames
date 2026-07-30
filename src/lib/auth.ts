@@ -9,11 +9,15 @@ const credentialsSchema = z.object({
   password: z.string().min(6),
 });
 
+const authSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: authSecret,
   trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   providers: [
     Credentials({
@@ -23,21 +27,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(raw) {
-        const parsed = credentialsSchema.safeParse(raw);
-        if (!parsed.success) return null;
+        try {
+          const parsed = credentialsSchema.safeParse(raw);
+          if (!parsed.success) return null;
 
-        const email = parsed.data.email.toLowerCase();
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return null;
+          const email = parsed.data.email.toLowerCase();
+          const user = await prisma.user.findUnique({ where: { email } });
+          if (!user) return null;
 
-        const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
-        if (!valid) return null;
+          const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
+          if (!valid) return null;
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name ?? user.email,
-        };
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name ?? user.email,
+          };
+        } catch (error) {
+          console.error("authorize failed", error);
+          return null;
+        }
       },
     }),
   ],
@@ -53,8 +62,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub ?? "";
-        session.user.email = token.email ?? "";
-        session.user.name = token.name ?? "";
+        session.user.email = (token.email as string) ?? "";
+        session.user.name = (token.name as string) ?? "";
       }
       return session;
     },
