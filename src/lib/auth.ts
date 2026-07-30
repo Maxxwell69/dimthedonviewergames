@@ -11,6 +11,21 @@ const credentialsSchema = z.object({
 
 const authSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
 
+/** Auth.js requires a full URL; Railway sometimes stores host-only values. */
+function normalizeAuthUrl(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+const authUrl = normalizeAuthUrl(process.env.AUTH_URL || process.env.NEXTAUTH_URL);
+if (authUrl) {
+  process.env.AUTH_URL = authUrl;
+  process.env.NEXTAUTH_URL = authUrl;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: authSecret,
   trustHost: true,
