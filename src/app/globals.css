@@ -401,6 +401,31 @@ pre {
   padding-bottom: 2rem;
 }
 
+/* OBS / stream overlay: wheel only, transparent page */
+html.overlay-mode,
+html.overlay-mode body,
+.display-shell.overlay-mode {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+.display-shell.overlay-mode {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 0;
+  gap: 0;
+  place-content: center;
+  place-items: center;
+}
+
+.display-shell.overlay-mode .wheel-stage {
+  filter: drop-shadow(0 0 28px rgba(160, 20, 30, 0.35));
+}
+
+.display-shell.overlay-mode .winner-overlay {
+  background: rgba(0, 0, 0, 0.35);
+}
+
 .display-title {
   font-size: clamp(1.4rem, 3vw, 2rem);
 }

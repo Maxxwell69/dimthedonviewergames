@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { serializeDisplayWheel } from "@/lib/wheel-service";
@@ -17,5 +18,9 @@ export default async function DisplayPage({ params }: Props) {
 
   if (!wheel) notFound();
 
-  return <DisplayClient token={token} initialWheel={serializeDisplayWheel(wheel)} />;
+  return (
+    <Suspense fallback={<div className="display-shell" />}>
+      <DisplayClient token={token} initialWheel={serializeDisplayWheel(wheel)} />
+    </Suspense>
+  );
 }

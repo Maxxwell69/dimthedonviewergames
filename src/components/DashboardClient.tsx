@@ -84,6 +84,11 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
     [origin, wheel.displayToken],
   );
 
+  const overlayUrl = useMemo(
+    () => (displayUrl ? `${displayUrl}?overlay=1` : ""),
+    [displayUrl],
+  );
+
   const webhookUrl = useMemo(
     () =>
       origin && wheel.webhookSecret
@@ -353,7 +358,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
 
           <section className="panel secret-panel">
             <h2>Display URL</h2>
-            <p className="hint">Private OBS / streamer view — only shown while logged in.</p>
+            <p className="hint">Full show page (logo + title + wheel).</p>
             <code className="url-box">{displayUrl || "Loading…"}</code>
             <div className="btn-row">
               <button
@@ -362,7 +367,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
                 disabled={!displayUrl}
                 onClick={() => copy(displayUrl, "Display URL")}
               >
-                Copy display URL
+                Copy full display URL
               </button>
               <a className="btn ghost" href={displayUrl || "#"} target="_blank" rel="noreferrer">
                 Open
@@ -375,6 +380,25 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
               >
                 Rotate link
               </button>
+            </div>
+
+            <h2 style={{ marginTop: "1.1rem" }}>Wheel-only overlay</h2>
+            <p className="hint">
+              Just the wheel — transparent background for OBS Browser Source. No header or page chrome.
+            </p>
+            <code className="url-box">{overlayUrl || "Loading…"}</code>
+            <div className="btn-row">
+              <button
+                type="button"
+                className="btn gold"
+                disabled={!overlayUrl}
+                onClick={() => copy(overlayUrl, "Overlay URL")}
+              >
+                Copy overlay URL
+              </button>
+              <a className="btn ghost" href={overlayUrl || "#"} target="_blank" rel="noreferrer">
+                Open overlay
+              </a>
             </div>
           </section>
 
