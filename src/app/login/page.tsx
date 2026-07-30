@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -36,7 +35,7 @@ export default function LoginPage() {
       <BrandHeader compact showBanner={false} />
       <form className="auth-card" onSubmit={onSubmit}>
         <h1>Operator login</h1>
-        <p className="hint">Sign in to run the wheel, display URL, and TikFinity webhook.</p>
+        <p className="hint">Single-operator access for Dom the Don Viewer Games.</p>
         <label className="field">
           Email
           <input
@@ -61,9 +60,6 @@ export default function LoginPage() {
         <button className="btn gold wide" type="submit" disabled={loading}>
           {loading ? "Signing in…" : "Sign in"}
         </button>
-        <p className="auth-switch">
-          Need an account? <Link href="/register">Create one</Link>
-        </p>
       </form>
     </main>
   );
