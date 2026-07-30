@@ -76,6 +76,7 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
         targetAngle={wheel.spinTargetAngle}
         spinDurationMs={wheel.spinDurationMs}
         spinStartedAt={wheel.spinStartedAt}
+        soundEnabled={wheel.soundEnabled}
         onSpinComplete={() => setShowWinner(true)}
         size={wheelSize}
       />
@@ -87,6 +88,7 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
       <WinnerOverlay
         winner={wheel.currentWinner}
         visible={showWinner && !wheel.isSpinning}
+        soundEnabled={wheel.soundEnabled}
       />
     </div>
   );

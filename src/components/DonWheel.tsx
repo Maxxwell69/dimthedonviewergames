@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useWheelSpinSound } from "@/hooks/useWheelSpinSound";
 
 export type WheelEntry = {
   id: string;
@@ -14,6 +15,7 @@ type DonWheelProps = {
   targetAngle: number | null;
   spinDurationMs: number;
   spinStartedAt?: string | null;
+  soundEnabled?: boolean;
   onSpinComplete?: () => void;
   size?: number;
   interactive?: boolean;
@@ -35,6 +37,7 @@ export function DonWheel({
   targetAngle,
   spinDurationMs,
   spinStartedAt,
+  soundEnabled = true,
   onSpinComplete,
   size = 520,
   interactive = false,
@@ -44,6 +47,8 @@ export function DonWheel({
   const [hubLogo, setHubLogo] = useState<HTMLImageElement | null>(null);
   const completedForSpin = useRef<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useWheelSpinSound(isSpinning, spinStartedAt, soundEnabled);
 
   const segments = useMemo(() => {
     if (!entries.length) {

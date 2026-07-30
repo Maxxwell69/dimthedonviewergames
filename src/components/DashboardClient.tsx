@@ -207,6 +207,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
             targetAngle={wheel.spinTargetAngle}
             spinDurationMs={wheel.spinDurationMs}
             spinStartedAt={wheel.spinStartedAt}
+            soundEnabled={wheel.soundEnabled}
             interactive
             onRequestSpin={spin}
             onSpinComplete={() => setShowWinner(true)}
@@ -216,6 +217,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
           <WinnerOverlay
             winner={wheel.currentWinner}
             visible={showWinner && !wheel.isSpinning}
+            soundEnabled={wheel.soundEnabled}
             showControls
             onDismiss={() => runAction("dismissWinner")}
           />
@@ -275,7 +277,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
                 checked={wheel.soundEnabled}
                 onChange={(e) => patchSettings({ soundEnabled: e.target.checked })}
               />
-              Sound enabled (display)
+              Spin sound
             </label>
             <label className="field">
               Spin duration (ms)
