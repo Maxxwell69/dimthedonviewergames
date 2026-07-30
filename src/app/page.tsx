@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
 
-export default async function HomePage() {
-  const session = await auth();
-  redirect(session?.user ? "/dashboard" : "/login");
+export default function HomePage() {
+  // Keep the root route simple — calling auth() here was crashing production
+  // when AUTH_SECRET/session setup threw. Login + middleware handle auth.
+  redirect("/login");
 }
