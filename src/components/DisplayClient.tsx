@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BrandHeader } from "@/components/BrandHeader";
 import { DonWheel } from "@/components/DonWheel";
@@ -24,6 +24,8 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
     Boolean(initialWheel.currentWinner && !initialWheel.isSpinning),
   );
   const [wheelSize, setWheelSize] = useState(520);
+  const [busy, setBusy] = useState(false);
+  const [spinError, setSpinError] = useState<string | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("overlay-mode", overlay);
@@ -74,7 +76,7 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
         );
       } else {
         setWheelSize(
-          Math.min(640, Math.max(280, Math.min(window.innerWidth, window.innerHeight) - 160)),
+          Math.min(640, Math.max(280, Math.min(window.innerWidth, window.innerHeight) - 200)),
         );
       }
     };
@@ -120,6 +122,23 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
     return () => clearInterval(id);
   }, [token]);
 
+  const spin = useCallback(async () => {
+    if (busy || wheel.isSpinning || wheel.entries.length < 1) return;
+    setBusy(true);
+    setSpinError(null);
+    setShowWinner(false);
+    try {
+      const res = await fetch(`/api/display/${token}/spin`, { method: "POST" });
+      const data = (await res.json()) as { wheel?: WheelDTO; error?: string };
+      if (!res.ok) throw new Error(data.error || "Spin failed");
+      if (data.wheel) setWheel(data.wheel);
+    } catch (error) {
+      setSpinError(error instanceof Error ? error.message : "Spin failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, token, wheel.entries.length, wheel.isSpinning]);
+
   return (
     <div
       data-overlay-root
@@ -143,16 +162,29 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
         soundEnabled={wheel.soundEnabled}
         spinVolume={wheel.spinVolume ?? 80}
         onSpinComplete={() => setShowWinner(true)}
+        onRequestSpin={overlay ? undefined : spin}
+        interactive={!overlay}
         size={wheelSize}
         cleanOverlay={overlay}
       />
 
       {!overlay ? (
-        <div className="viewer-banner">
-          <span>★</span>
-          <strong>VIEWER GAMES</strong>
-          <span>★</span>
-        </div>
+        <>
+          <button
+            type="button"
+            className="btn gold display-spin-btn"
+            disabled={busy || wheel.isSpinning || wheel.entries.length < 1}
+            onClick={spin}
+          >
+            {wheel.isSpinning ? "Spinning…" : "Spin"}
+          </button>
+          {spinError ? <p className="display-spin-error">{spinError}</p> : null}
+          <div className="viewer-banner">
+            <span>★</span>
+            <strong>VIEWER GAMES</strong>
+            <span>★</span>
+          </div>
+        </>
       ) : null}
 
       <WinnerOverlay

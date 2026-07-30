@@ -24,6 +24,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
   const [origin, setOrigin] = useState("");
   const [showWinner, setShowWinner] = useState(false);
   const [wheelSize, setWheelSize] = useState(520);
+  const [testUsername, setTestUsername] = useState("webhook_test");
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -134,28 +135,94 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
     }
   }, []);
 
-  const runAction = useCallback(async (action: string) => {
+  const runAction = useCallback(async (action: string, extra?: Record<string, unknown>) => {
     setBusy(true);
     setMessage(null);
     try {
       const res = await fetch("/api/wheel/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, ...extra }),
       });
-      const data = await readJson<{ wheel: WheelDTO }>(res);
+      const data = await readJson<{
+        wheel: WheelDTO;
+        label?: string;
+        alreadyEntered?: boolean;
+      }>(res);
       setWheel(data.wheel);
       if (typeof data.wheel.entriesText === "string") {
         setEntriesText(data.wheel.entriesText);
       }
       if (action === "dismissWinner") setShowWinner(false);
       if (action.startsWith("regenerate")) setMessage("New secret URL generated");
+      if (action === "testEnter" && data.label) {
+        setMessage(
+          data.alreadyEntered
+            ? `${data.label} already on the wheel (webhook path OK)`
+            : `${data.label} entered via test (webhook path OK)`,
+        );
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Action failed");
     } finally {
       setBusy(false);
     }
   }, []);
+
+  const testWebhookEnter = useCallback(async () => {
+    const username = testUsername.trim() || "webhook_test";
+    // Hit the real TikFinity webhook route first (what OBS/TikFinity should call).
+    if (webhookUrl) {
+      setBusy(true);
+      setMessage(null);
+      try {
+        const res = await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username,
+            nickname: username,
+            userId: "dashboard-test",
+            command: "!enter",
+          }),
+        });
+        const data = await readJson<{
+          ok?: boolean;
+          label?: string;
+          alreadyEntered?: boolean;
+          error?: string;
+        }>(res);
+        if (data.label) {
+          setMessage(
+            data.alreadyEntered
+              ? `${data.label} already on the wheel — webhook HIT`
+              : `${data.label} entered — webhook HIT`,
+          );
+        } else {
+          setMessage("Webhook HIT");
+        }
+        // Refresh wheel from server so the entry list updates immediately
+        const wheelRes = await fetch("/api/wheel", { cache: "no-store" });
+        const wheelData = await readJson<{ wheel: WheelDTO }>(wheelRes);
+        setWheel(wheelData.wheel);
+        if (typeof wheelData.wheel.entriesText === "string") {
+          setEntriesText(wheelData.wheel.entriesText);
+        }
+        return;
+      } catch (error) {
+        setMessage(
+          error instanceof Error
+            ? `Webhook test failed: ${error.message}`
+            : "Webhook test failed",
+        );
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
+    // Fallback if origin/URL not ready yet
+    await runAction("testEnter", { username });
+  }, [testUsername, webhookUrl, runAction]);
 
   const spin = useCallback(async () => {
     setBusy(true);
@@ -437,6 +504,29 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
               >
                 Rotate secret
               </button>
+            </div>
+            <div className="webhook-test">
+              <h3>Test webhook</h3>
+              <p className="hint">
+                Simulates TikFinity hitting this endpoint. If the name appears on the wheel, your app is fine — fix TikFinity config next.
+              </p>
+              <div className="btn-row webhook-test-row">
+                <input
+                  className="title-input test-user-input"
+                  value={testUsername}
+                  onChange={(e) => setTestUsername(e.target.value)}
+                  placeholder="test username"
+                  aria-label="Test username"
+                />
+                <button
+                  type="button"
+                  className="btn gold"
+                  disabled={busy}
+                  onClick={testWebhookEnter}
+                >
+                  Test !enter
+                </button>
+              </div>
             </div>
           </section>
 

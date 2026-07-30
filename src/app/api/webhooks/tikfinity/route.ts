@@ -19,6 +19,10 @@ export async function POST(req: Request) {
   try {
     const url = new URL(req.url);
     const contentType = req.headers.get("content-type") || "";
+    console.info("[tikfinity-webhook] POST hit", {
+      contentType,
+      hasSecretQuery: Boolean(url.searchParams.get("secret")),
+    });
 
     let body: Record<string, unknown> = {};
     if (contentType.includes("application/json")) {
@@ -49,6 +53,7 @@ export async function POST(req: Request) {
       "";
 
     if (!secret) {
+      console.warn("[tikfinity-webhook] rejected: missing secret");
       return NextResponse.json({ error: "Missing webhook secret" }, { status: 401 });
     }
 
@@ -66,8 +71,14 @@ export async function POST(req: Request) {
     });
 
     if (!result.ok) {
+      console.warn("[tikfinity-webhook] rejected:", result.error, { username, nickname });
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
+
+    console.info("[tikfinity-webhook] ok", {
+      label: result.label,
+      alreadyEntered: result.alreadyEntered,
+    });
 
     return NextResponse.json({
       ok: true,

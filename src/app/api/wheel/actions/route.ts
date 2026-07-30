@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import {
+  addTikfinityEntry,
   clearWheelEntries,
   dismissWinner,
   getSharedWheel,
   regenerateDisplayToken,
   regenerateWebhookSecret,
+  serializeWheel,
   shuffleWheelEntries,
 } from "@/lib/wheel-service";
 
@@ -25,6 +27,25 @@ export async function POST(req: Request) {
         return NextResponse.json({ wheel: await regenerateDisplayToken(wheel.id) });
       case "regenerateWebhookSecret":
         return NextResponse.json({ wheel: await regenerateWebhookSecret(wheel.id) });
+      case "testEnter": {
+        const username = String(body.username || "webhook_test").trim() || "webhook_test";
+        const result = await addTikfinityEntry({
+          webhookSecret: wheel.webhookSecret,
+          username,
+          nickname: username,
+        });
+        if (!result.ok) {
+          return NextResponse.json({ error: result.error }, { status: 400 });
+        }
+        const refreshed = result.wheel
+          ? result.wheel
+          : serializeWheel(await getSharedWheel());
+        return NextResponse.json({
+          wheel: refreshed,
+          label: result.label,
+          alreadyEntered: result.alreadyEntered,
+        });
+      }
       default:
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
