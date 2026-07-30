@@ -432,9 +432,15 @@ html.overlay-mode #__next,
   box-shadow: none !important;
 }
 
-/* No dim plate behind winner card in overlay */
+/* Keep page transparent, but restore the solid winner card box */
 .display-shell.overlay-mode .winner-overlay {
   background: transparent !important;
+}
+
+.display-shell.overlay-mode .winner-card {
+  background: linear-gradient(180deg, #2a1212, #100808) !important;
+  border: 1px solid var(--gold) !important;
+  box-shadow: var(--shadow-glow) !important;
 }
 
 .display-title {

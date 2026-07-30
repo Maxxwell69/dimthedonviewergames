@@ -34,13 +34,23 @@ export function DisplayClient({ token, initialWheel }: DisplayClientProps) {
     style.setAttribute("data-overlay-transparency", "1");
     style.textContent = overlay
       ? `
-      html, body, body *, #__next, [data-overlay-root] {
+      html, body, #__next, [data-overlay-root], .display-shell, .wheel-stage, .wheel-canvas, .winner-overlay {
         background: transparent !important;
         background-color: transparent !important;
         background-image: none !important;
       }
       body { margin: 0 !important; }
-      .wheel-stage, .wheel-canvas { background: transparent !important; filter: none !important; box-shadow: none !important; }
+      .wheel-stage, .wheel-canvas { filter: none !important; box-shadow: none !important; }
+      .winner-card {
+        background: linear-gradient(180deg, #2a1212, #100808) !important;
+        border: 1px solid #c9a24d !important;
+        box-shadow: 0 0 60px rgba(155, 21, 36, 0.35) !important;
+      }
+      .winner-kicker, .winner-name { background: transparent !important; }
+      .btn.gold {
+        background: linear-gradient(180deg, #e8d08a, #c9a24d) !important;
+        color: #1a1208 !important;
+      }
     `
       : "";
     if (overlay) document.head.appendChild(style);

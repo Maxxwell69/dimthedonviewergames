@@ -268,7 +268,7 @@ export function DashboardClient({ initialWheel }: DashboardClientProps) {
                 checked={wheel.removeOnWin}
                 onChange={(e) => patchSettings({ removeOnWin: e.target.checked })}
               />
-              Remove winner after spin
+              Remove winner after Continue
             </label>
             <label className="check">
               <input

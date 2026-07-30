@@ -393,19 +393,9 @@ export async function finalizeSpin(wheelId: string) {
   });
   if (!wheel || !wheel.isSpinning || !wheel.currentWinner) return null;
 
+  // Record the win, but keep the name on the wheel until Continue is pressed.
   await prisma.winner.create({
     data: { wheelId, label: wheel.currentWinner },
-  });
-
-  if (wheel.removeOnWin) {
-    await prisma.entry.deleteMany({
-      where: { wheelId, label: wheel.currentWinner },
-    });
-  }
-
-  const entries = await prisma.entry.findMany({
-    where: { wheelId },
-    orderBy: { sortOrder: "asc" },
   });
 
   const updated = await prisma.wheel.update({
@@ -415,9 +405,6 @@ export async function finalizeSpin(wheelId: string) {
       lastWinnerAt: new Date(),
       spinStartedAt: null,
       spinEndsAt: null,
-      entriesText: entries
-        .map((e) => (e.weight > 1 ? `${e.label}:${e.weight}` : e.label))
-        .join("\n"),
     },
     include: {
       entries: { orderBy: { sortOrder: "asc" } },
@@ -435,12 +422,30 @@ export async function finalizeSpin(wheelId: string) {
 }
 
 export async function dismissWinner(wheelId: string) {
+  const current = await prisma.wheel.findUnique({ where: { id: wheelId } });
+  if (!current) throw new Error("Wheel not found");
+
+  // Remove winner from entries only when Continue is hit (if enabled).
+  if (current.removeOnWin && current.currentWinner) {
+    await prisma.entry.deleteMany({
+      where: { wheelId, label: current.currentWinner },
+    });
+  }
+
+  const entries = await prisma.entry.findMany({
+    where: { wheelId },
+    orderBy: { sortOrder: "asc" },
+  });
+
   const wheel = await prisma.wheel.update({
     where: { id: wheelId },
     data: {
       currentWinner: null,
       lastWinnerAt: null,
       spinTargetAngle: null,
+      entriesText: entries
+        .map((e) => (e.weight > 1 ? `${e.label}:${e.weight}` : e.label))
+        .join("\n"),
     },
     include: {
       entries: { orderBy: { sortOrder: "asc" } },
