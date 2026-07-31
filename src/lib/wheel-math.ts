@@ -5,9 +5,7 @@ export type WeightedEntry = {
 };
 
 export function normalizeLabel(raw: string) {
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-  return trimmed.startsWith("@") ? trimmed : `@${trimmed.replace(/^@+/, "")}`;
+  return raw.trim().replace(/^@+/, "");
 }
 
 export function parseEntriesText(text: string): { label: string; weight: number }[] {
@@ -24,7 +22,7 @@ export function parseEntriesText(text: string): { label: string; weight: number 
       }
       return { label: normalizeLabel(line), weight: 1 };
     })
-    .filter((e) => e.label.length > 1);
+    .filter((e) => e.label.length > 0);
 }
 
 export function pickWeightedIndex(entries: WeightedEntry[], random = Math.random()) {

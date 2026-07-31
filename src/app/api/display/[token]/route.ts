@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { serializeDisplayWheel } from "@/lib/wheel-service";
+import { serializeDisplayWheel, stripAtSignsFromWheel } from "@/lib/wheel-service";
 
 type Params = { params: Promise<{ token: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
   const { token } = await params;
-  const wheel = await prisma.wheel.findUnique({
+  let wheel = await prisma.wheel.findUnique({
     where: { displayToken: token },
     include: {
       entries: { orderBy: { sortOrder: "asc" } },
@@ -14,6 +14,18 @@ export async function GET(_req: Request, { params }: Params) {
     },
   });
 
+  if (!wheel) {
+    return NextResponse.json({ error: "Display not found" }, { status: 404 });
+  }
+
+  await stripAtSignsFromWheel(wheel.id);
+  wheel = await prisma.wheel.findUnique({
+    where: { displayToken: token },
+    include: {
+      entries: { orderBy: { sortOrder: "asc" } },
+      winners: { orderBy: { createdAt: "desc" }, take: 25 },
+    },
+  });
   if (!wheel) {
     return NextResponse.json({ error: "Display not found" }, { status: 404 });
   }

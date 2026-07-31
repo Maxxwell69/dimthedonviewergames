@@ -77,13 +77,83 @@ export async function listWheelsForUser(userId: string): Promise<WheelSummaryDTO
   }));
 }
 
+/** Rewrite stored labels that still have a leading @ (from older normalizeLabel). */
+export async function stripAtSignsFromWheel(wheelId: string) {
+  const wheel = await prisma.wheel.findUnique({
+    where: { id: wheelId },
+    include: {
+      entries: true,
+      winners: { take: 50, orderBy: { createdAt: "desc" } },
+    },
+  });
+  if (!wheel) return;
+
+  const dirty =
+    wheel.entries.some((e) => e.label.startsWith("@")) ||
+    (wheel.currentWinner?.startsWith("@") ?? false) ||
+    wheel.winners.some((w) => w.label.startsWith("@")) ||
+    /(?:^|\n)@/m.test(wheel.entriesText);
+  if (!dirty) return;
+
+  for (const entry of wheel.entries) {
+    const clean = normalizeLabel(entry.label);
+    if (!clean || clean === entry.label) continue;
+    const conflict = await prisma.entry.findUnique({
+      where: { wheelId_label: { wheelId, label: clean } },
+    });
+    if (conflict && conflict.id !== entry.id) {
+      await prisma.entry.delete({ where: { id: entry.id } });
+      continue;
+    }
+    await prisma.entry.update({
+      where: { id: entry.id },
+      data: {
+        label: clean,
+        tiktokUsername: entry.tiktokUsername
+          ? normalizeLabel(entry.tiktokUsername)
+          : entry.tiktokUsername,
+      },
+    });
+  }
+
+  for (const winner of wheel.winners) {
+    const clean = normalizeLabel(winner.label);
+    if (clean && clean !== winner.label) {
+      await prisma.winner.update({
+        where: { id: winner.id },
+        data: { label: clean },
+      });
+    }
+  }
+
+  const entries = await prisma.entry.findMany({
+    where: { wheelId },
+    orderBy: { sortOrder: "asc" },
+  });
+  await prisma.wheel.update({
+    where: { id: wheelId },
+    data: {
+      currentWinner: wheel.currentWinner
+        ? normalizeLabel(wheel.currentWinner)
+        : wheel.currentWinner,
+      entriesText: entries
+        .map((e) => (e.weight > 1 ? `${e.label}:${e.weight}` : e.label))
+        .join("\n"),
+    },
+  });
+}
+
 export async function getWheelForUser(userId: string, wheelId: string) {
   const wheel = await prisma.wheel.findFirst({
     where: { id: wheelId, userId },
     include: wheelInclude,
   });
   if (!wheel) return null;
-  return wheel;
+  await stripAtSignsFromWheel(wheel.id);
+  return prisma.wheel.findFirst({
+    where: { id: wheelId, userId },
+    include: wheelInclude,
+  });
 }
 
 export async function getOrCreateWheelForUser(userId: string) {
@@ -143,19 +213,32 @@ export function serializeWheel(
     spinStartedAt: wheel.spinStartedAt?.toISOString() ?? null,
     spinEndsAt: wheel.spinEndsAt?.toISOString() ?? null,
     spinTargetAngle: wheel.spinTargetAngle,
-    currentWinner: wheel.currentWinner,
+    currentWinner: wheel.currentWinner ? normalizeLabel(wheel.currentWinner) : null,
     lastWinnerAt: wheel.lastWinnerAt?.toISOString() ?? null,
-    entriesText: wheel.entriesText,
+    entriesText: wheel.entriesText
+      .split(/\r?\n/)
+      .map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return "";
+        const weightMatch = trimmed.match(/^(.*?)(?::\s*|,\s*|x)(\d+)\s*$/i);
+        if (weightMatch) {
+          const label = normalizeLabel(weightMatch[1]);
+          return label ? `${label}:${weightMatch[2]}` : "";
+        }
+        return normalizeLabel(trimmed);
+      })
+      .filter(Boolean)
+      .join("\n"),
     entries: wheel.entries.map((e) => ({
       id: e.id,
-      label: e.label,
+      label: normalizeLabel(e.label),
       weight: e.weight,
       source: e.source,
-      tiktokUsername: e.tiktokUsername,
+      tiktokUsername: e.tiktokUsername ? normalizeLabel(e.tiktokUsername) : e.tiktokUsername,
     })),
     winners: wheel.winners.map((w) => ({
       id: w.id,
-      label: w.label,
+      label: normalizeLabel(w.label),
       createdAt: w.createdAt.toISOString(),
     })),
     updatedAt: wheel.updatedAt.toISOString(),
@@ -387,7 +470,11 @@ export async function addTikfinityEntry(input: {
   const raw = input.username || input.nickname;
   if (!raw) return { ok: false as const, error: "Missing username" };
 
+  await stripAtSignsFromWheel(wheel.id);
+
   const label = normalizeLabel(raw);
+  if (!label) return { ok: false as const, error: "Missing username" };
+
   const existing = await prisma.entry.findUnique({
     where: { wheelId_label: { wheelId: wheel.id, label } },
   });
@@ -446,6 +533,7 @@ export async function addTikfinityEntry(input: {
 }
 
 export async function spinWheel(wheelId: string) {
+  await stripAtSignsFromWheel(wheelId);
   const wheel = await prisma.wheel.findUnique({
     where: { id: wheelId },
     include: {
@@ -470,7 +558,7 @@ export async function spinWheel(wheelId: string) {
       spinStartedAt: startedAt,
       spinEndsAt: endsAt,
       spinTargetAngle: targetAngle,
-      currentWinner: winner.label,
+      currentWinner: normalizeLabel(winner.label),
       lastWinnerAt: null,
     },
     include: {
