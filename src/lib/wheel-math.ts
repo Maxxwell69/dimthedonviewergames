@@ -35,7 +35,7 @@ export function pickWeightedIndex(entries: WeightedEntry[], random = Math.random
   return entries.length - 1;
 }
 
-/** Pointer is at top (12 o'clock). Segment 0 starts at -90deg in canvas terms after rotation. */
+/** Pointer is at right (3 o'clock). Segment 0 starts at -90deg in canvas terms after rotation. */
 export function targetAngleForIndex(
   winnerIndex: number,
   entries: WeightedEntry[],
@@ -48,8 +48,8 @@ export function targetAngleForIndex(
   }
   const segmentSize = (Math.max(1, entries[winnerIndex].weight) / totalWeight) * 360;
   const mid = start + segmentSize / 2;
-  // Wheel rotation so that mid lands under the top pointer
-  const base = 360 - mid;
+  // Wheel rotation so that mid lands under the right-side pointer (horizontal labels)
+  const base = (((90 - mid) % 360) + 360) % 360;
   return spins * 360 + base;
 }
 
