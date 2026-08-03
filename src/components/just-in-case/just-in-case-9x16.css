@@ -99,8 +99,9 @@
 .just-in-case-vertical header{
   height: 79px;
   display: grid;
-  grid-template-columns: 68px 1fr 68px;
+  grid-template-columns: 1fr;
   align-items: center;
+  justify-items: center;
   border-radius: 8px 8px 2px 2px;
 }
 .just-in-case-vertical .round{
@@ -355,14 +356,12 @@
   min-height: 43px;
   margin-top: 5px;
   padding: 5px 8px;
-  display: grid;
-  grid-template-columns: 66px 66px 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 8px;
 }
-.just-in-case-vertical footer span{ border-right: 1px solid #846a38; font: 800 6px Arial, sans-serif; letter-spacing: .08em; color: #9f895d; }
-.just-in-case-vertical footer b{ display: block; color: var(--gold); font-size: 11px; margin-top: 1px; }
-.just-in-case-vertical footer p{ margin: 0; text-align: right; font: 800 6px Arial, sans-serif; letter-spacing: .06em; color: #af9867; }
+.just-in-case-vertical footer p{ margin: 0; text-align: center; font: 800 6px Arial, sans-serif; letter-spacing: .06em; color: #af9867; }
 .just-in-case-vertical footer button{ padding: 6px; background: #a77c36; color: #080c09; border: 1px solid #eed28a; font: 900 8px Arial, sans-serif; }
 
 .just-in-case-vertical .modal-bg{
@@ -410,7 +409,7 @@
 @media (max-width: 390px) {
   .just-in-case-vertical .game{ padding-top: 46px; }
   .just-in-case-vertical .top-tools button{ padding-inline: 4px; font-size: 7px; }
-  .just-in-case-vertical header{ grid-template-columns: 55px 1fr 55px; }
+  .just-in-case-vertical header{ grid-template-columns: 1fr; }
   .just-in-case-vertical .brand h1{ font-size: 27px; }
   .just-in-case-vertical .player, .just-in-case-vertical .dom{ min-height: 205px; }
   .just-in-case-vertical .cases{ grid-template-rows: repeat(5, 61px); gap: 7px 5px; padding-inline: 8px; }

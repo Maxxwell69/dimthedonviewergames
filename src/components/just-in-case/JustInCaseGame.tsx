@@ -558,18 +558,10 @@ export function JustInCaseGame({
         ) : null}
 
         <header>
-          <div className="round">SIT-DOWN {round + 1}</div>
           <div className="brand">
             <small>DOM THE DON PRESENTS</small>
             <h1>JUST IN CASE</h1>
             <p>EVERY CHOICE HAS A PRICE</p>
-          </div>
-          <div className="round right">
-            {phase === "offer"
-              ? "THE OFFER"
-              : phase === "choose"
-                ? "PICK A CASE"
-                : `OPEN ${Math.max(0, target - roundCount)}`}
           </div>
         </header>
 
@@ -665,15 +657,6 @@ export function JustInCaseGame({
         </section>
 
         <footer>
-          <span>
-            OPENED <b>{opened.length}/19</b>
-          </span>
-          <span>
-            ROUND{" "}
-            <b>
-              {roundCount}/{target}
-            </b>
-          </span>
           <p>
             {phase === "finished"
               ? "DOM ALWAYS SETTLES THE BOOKS"

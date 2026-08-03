@@ -205,4 +205,19 @@
   align-self: center;
 }
 
+/* Header/footer without side status panels */
+.just-in-case header {
+  grid-template-columns: 1fr !important;
+  justify-items: center;
+}
+.just-in-case footer {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.just-in-case footer p {
+  margin-left: 0 !important;
+  text-align: center;
+}
 
