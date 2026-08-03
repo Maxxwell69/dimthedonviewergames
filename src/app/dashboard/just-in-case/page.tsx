@@ -1,17 +1,17 @@
 import { auth } from "@/lib/auth";
-import { JustInCaseGame } from "@/components/just-in-case/JustInCaseGame";
+import { JustInCaseSizeChooser } from "@/components/just-in-case/JustInCaseSizeChooser";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Just in Case · Dom the Don",
-  description: "Admin-only Deal or No Deal style sit-down game",
+  title: "Just in Case · Choose size",
+  description: "Choose 16:9 or 9:16 before opening Just in Case",
 };
 
-export default async function JustInCasePage() {
+export default async function JustInCaseChooserPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  return <JustInCaseGame />;
+  return <JustInCaseSizeChooser />;
 }

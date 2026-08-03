@@ -2,17 +2,34 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import "./just-in-case.css";
 
 const RATIOS = [
   0.000001, 0.000005, 0.00001, 0.000025, 0.00005, 0.0001, 0.00025, 0.0005,
   0.00075, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 1,
 ];
 const ROUNDS = [6, 5, 4, 3, 2, 1];
+const SYNC_KEY = "dom-the-don-shared-game-v1";
 
 type Phase = "choose" | "opening" | "offer" | "final" | "finished";
 type Case = { id: number; value: number };
 type SoundFile = { name: string; url: string } | null;
+type OverlayView = "full" | "cases" | "player" | "offer";
+type SharedGame = {
+  max: number;
+  draft: number;
+  values: number[];
+  cases: Case[];
+  reserved: number | null;
+  opened: number[];
+  round: number;
+  roundCount: number;
+  phase: Phase;
+  offer: number;
+  result: string;
+  revealing: number | null;
+};
+
+export type JustInCaseVariant = "landscape" | "portrait";
 
 const chips = (n: number) => `◆ ${Math.round(n).toLocaleString()}`;
 
@@ -40,7 +57,17 @@ function domsOffer(values: number[], round: number) {
   return Math.max(1, Math.round((avg * leverage * patience) / 10) * 10);
 }
 
-export function JustInCaseGame() {
+type JustInCaseGameProps = {
+  variant?: JustInCaseVariant;
+};
+
+export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
+  const rootClass = variant === "portrait" ? "just-in-case-vertical" : "just-in-case";
+  const gameHref =
+    variant === "portrait"
+      ? "/dashboard/just-in-case/vertical"
+      : "/dashboard/just-in-case/widescreen";
+
   const [max, setMax] = useState(1_000_000);
   const [draft, setDraft] = useState(1_000_000);
   const [values, setValues] = useState(() => ladder(1_000_000));
@@ -60,10 +87,12 @@ export function JustInCaseGame() {
   const [music, setMusic] = useState<SoundFile>(null);
   const [offerSound, setOfferSound] = useState<SoundFile>(null);
   const [finalSound, setFinalSound] = useState<SoundFile>(null);
+  const [overlay, setOverlay] = useState<OverlayView>("full");
   const audioCtx = useRef<AudioContext | null>(null);
   const musicAudio = useRef<HTMLAudioElement | null>(null);
   const musicTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [audioReady, setAudioReady] = useState(false);
+  const [syncReady, setSyncReady] = useState(false);
 
   const remaining = useMemo(
     () => cases.filter((c) => !opened.includes(c.id)).map((c) => c.value),
@@ -72,6 +101,91 @@ export function JustInCaseGame() {
   const target = ROUNDS[Math.min(round, ROUNDS.length - 1)];
   const mine = cases.find((c) => c.id === reserved);
   const top = Math.max(...remaining);
+
+  useEffect(() => {
+    const view = new URLSearchParams(window.location.search).get("overlay");
+    if (view === "cases" || view === "player" || view === "offer") setOverlay(view);
+  }, []);
+
+  function setView(view: OverlayView) {
+    setOverlay(view);
+    const url = new URL(window.location.href);
+    if (view === "full") url.searchParams.delete("overlay");
+    else url.searchParams.set("overlay", view);
+    window.history.replaceState({}, "", url);
+  }
+
+  function applyShared(data: SharedGame) {
+    setMax(data.max);
+    setDraft(data.draft);
+    setValues(data.values);
+    setCases(data.cases);
+    setReserved(data.reserved);
+    setOpened(data.opened);
+    setRound(data.round);
+    setRoundCount(data.roundCount);
+    setPhase(data.phase);
+    setOffer(data.offer);
+    setResult(data.result);
+    setRevealing(data.revealing);
+  }
+
+  useEffect(() => {
+    const stored = localStorage.getItem(SYNC_KEY);
+    if (stored) {
+      try {
+        applyShared(JSON.parse(stored) as SharedGame);
+      } catch {
+        localStorage.removeItem(SYNC_KEY);
+      }
+    }
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === SYNC_KEY && event.newValue) {
+        try {
+          applyShared(JSON.parse(event.newValue) as SharedGame);
+        } catch {
+          /* ignore bad sync payloads */
+        }
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    setSyncReady(true);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!syncReady) return;
+    const shared: SharedGame = {
+      max,
+      draft,
+      values,
+      cases,
+      reserved,
+      opened,
+      round,
+      roundCount,
+      phase,
+      offer,
+      result,
+      revealing,
+    };
+    const json = JSON.stringify(shared);
+    if (localStorage.getItem(SYNC_KEY) !== json) localStorage.setItem(SYNC_KEY, json);
+  }, [
+    syncReady,
+    max,
+    draft,
+    values,
+    cases,
+    reserved,
+    opened,
+    round,
+    roundCount,
+    phase,
+    offer,
+    result,
+    revealing,
+  ]);
 
   function context() {
     if (!audioCtx.current) {
@@ -289,13 +403,25 @@ export function JustInCaseGame() {
             ? "Opening your final briefcase…"
             : "The sit-down is over";
 
+  const otherLayoutHref =
+    variant === "portrait"
+      ? "/dashboard/just-in-case/widescreen"
+      : "/dashboard/just-in-case/vertical";
+  const otherLayoutLabel = variant === "portrait" ? "16:9 LAYOUT" : "9:16 LAYOUT";
+
   return (
-    <div className="just-in-case">
-      <main className="game" onPointerDown={context}>
+    <div className={rootClass}>
+      <main className={`game overlay-${overlay}`} onPointerDown={context}>
         <div className="top-tools">
           <div>
+            <Link className="admin-exit" href="/dashboard/just-in-case">
+              ← SIZE
+            </Link>
             <Link className="admin-exit" href="/dashboard">
-              ← DASHBOARD
+              DASHBOARD
+            </Link>
+            <Link className="admin-exit" href={otherLayoutHref}>
+              {otherLayoutLabel}
             </Link>
             <button className={musicOn ? "on" : ""} onClick={() => setMusicOn((v) => !v)}>
               ♫ MUSIC
@@ -315,6 +441,12 @@ export function JustInCaseGame() {
             <button onClick={() => setSetup(true)}>⚙ OWNER SETUP</button>
           </div>
         </div>
+
+        {overlay !== "full" && (
+          <button className="overlay-exit" onClick={() => setView("full")}>
+            ← FULL GAME
+          </button>
+        )}
 
         <header>
           <div className="round">SIT-DOWN {round + 1}</div>
@@ -389,9 +521,7 @@ export function JustInCaseGame() {
 
           <aside className={`dom panel ${phase === "offer" ? "calling" : ""}`}>
             <h2>DOM THE DON</h2>
-            <div className="portrait">
-              <i />
-            </div>
+            <div className="portrait camera-slot" aria-label="Blank camera overlay area" />
             <div className="offer-label">DOM’S OFFER</div>
             <div className={`offer ${phase === "offer" ? "active" : ""}`}>
               {offer ? chips(phase === "offer" ? offerDisplay : offer) : "—"}
@@ -418,7 +548,8 @@ export function JustInCaseGame() {
             OPENED <b>{opened.length}/19</b>
           </span>
           <span>
-            ROUND <b>
+            ROUND{" "}
+            <b>
               {roundCount}/{target}
             </b>
           </span>
@@ -466,6 +597,45 @@ export function JustInCaseGame() {
                 value={finalSound}
                 onFile={(f) => file("final", f)}
               />
+              <div className="overlay-admin">
+                <h3>OBS OVERLAY VIEWS</h3>
+                <p>
+                  Open one clean game box at a time. Copy the browser address after opening a view
+                  and use it as that OBS browser source. Overlays sync through this browser profile.
+                </p>
+                <p className="overlay-url-hint">
+                  Base URL: <code>{gameHref}</code>
+                </p>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSetup(false);
+                      setView("cases");
+                    }}
+                  >
+                    BRIEFCASES
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSetup(false);
+                      setView("player");
+                    }}
+                  >
+                    YOUR CASE
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSetup(false);
+                      setView("offer");
+                    }}
+                  >
+                    DOM’S OFFER
+                  </button>
+                </div>
+              </div>
               <button className="save" onClick={save}>
                 SAVE & START THE SIT-DOWN
               </button>

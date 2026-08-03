@@ -603,6 +603,41 @@ html.overlay-mode #__next,
   font-size: 0.9rem;
 }
 
+.size-chooser-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.size-choice-card {
+  min-height: 100%;
+}
+
+.size-preview {
+  display: grid;
+  place-items: center;
+  height: 110px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(160deg, rgba(60, 24, 24, 0.55), rgba(8, 6, 6, 0.9)),
+    radial-gradient(circle at 30% 20%, rgba(201, 162, 77, 0.18), transparent 55%);
+}
+
+.size-preview span {
+  display: block;
+  border: 2px solid var(--gold);
+  background: rgba(12, 8, 8, 0.85);
+  box-shadow: 0 0 18px rgba(201, 162, 77, 0.2);
+}
+
+.size-preview.landscape span {
+  width: 72%;
+  aspect-ratio: 16 / 9;
+}
+
+.size-preview.portrait span {
+  height: 78%;
+  aspect-ratio: 9 / 16;
+}
+
 .create-wheel-panel {
   margin-bottom: 1.5rem;
 }

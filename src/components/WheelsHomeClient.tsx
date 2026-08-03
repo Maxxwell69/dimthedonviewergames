@@ -125,10 +125,12 @@ export function WheelsHomeClient({
           <article className="studio-game-card">
             <div>
               <h3>Just in Case</h3>
-              <p>Dom the Don briefcase sit-down — pick a case, open the rest, take or walk Dom&apos;s offer.</p>
+              <p>
+                Dom the Don briefcase sit-down. Choose 16:9 or 9:16 before entering, then use OBS overlay views from Owner Setup.
+              </p>
             </div>
             <Link className="btn gold" href="/dashboard/just-in-case">
-              Open game
+              Choose size &amp; open
             </Link>
           </article>
         </div>
