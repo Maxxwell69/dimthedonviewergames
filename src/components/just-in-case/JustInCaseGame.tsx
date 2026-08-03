@@ -112,6 +112,7 @@ export function JustInCaseGame({
   const [syncToken, setSyncToken] = useState<string | null>(publicToken ?? null);
   const [overlayPaths, setOverlayPaths] = useState<OverlayPaths | null>(null);
   const [copyNote, setCopyNote] = useState<string | null>(null);
+  const [origin, setOrigin] = useState("");
   const applyingRemote = useRef(false);
 
   const remaining = useMemo(
@@ -128,6 +129,7 @@ export function JustInCaseGame({
   const canInteract = !isViewer;
 
   useEffect(() => {
+    setOrigin(window.location.origin);
     const view = new URLSearchParams(window.location.search).get("overlay");
     if (view === "cases" || view === "player" || view === "offer") setOverlay(view);
   }, []);
@@ -251,6 +253,10 @@ export function JustInCaseGame({
         if (cancelled || !data.token || !data.overlays) return;
         setSyncToken(data.token);
         setOverlayPaths(data.overlays[layoutKey]);
+        // Keep the address bar on a public URL so copied links work in TikTok/OBS.
+        const next = new URL(window.location.href);
+        next.pathname = `/just-in-case/${data.token}/${layoutKey}`;
+        window.history.replaceState({}, "", next);
         return;
       }
 
@@ -725,17 +731,26 @@ export function JustInCaseGame({
                 onFile={(f) => file("final", f)}
               />
               <div className="overlay-admin">
-                <h3>PUBLIC OBS OVERLAY URLS</h3>
+                <h3>TIKTOK / OBS PUBLIC URLS</h3>
                 <p>
-                  These links are public (no login). Paste them into OBS browser sources. They stay
-                  synced while you run the game from this host page.
+                  Use these only — they never ask for login. Do not paste a /dashboard or /login
+                  link into TikTok Live Studio.
                 </p>
                 {overlayPaths ? (
                   <>
                     <p className="overlay-url-hint">
-                      Public full game: <code>{overlayPaths.full}</code>
+                      Full game (public):{" "}
+                      <code>
+                        {origin ? `${origin}${overlayPaths.full}` : overlayPaths.full}
+                      </code>
                     </p>
                     <div>
+                      <button
+                        type="button"
+                        onClick={() => void copyOverlay(overlayPaths.full, "Full game")}
+                      >
+                        COPY FULL GAME
+                      </button>
                       <button
                         type="button"
                         onClick={() => void copyOverlay(overlayPaths.cases, "Briefcases")}
@@ -770,11 +785,6 @@ export function JustInCaseGame({
                 ) : (
                   <p className="overlay-url-hint">Loading public overlay links…</p>
                 )}
-                {syncToken ? (
-                  <p className="overlay-url-hint">
-                    Overlay token: <code>{syncToken}</code>
-                  </p>
-                ) : null}
                 {copyNote ? <p className="overlay-url-hint">{copyNote}</p> : null}
               </div>
               <button className="save" onClick={save}>

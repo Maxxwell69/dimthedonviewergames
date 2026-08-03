@@ -126,15 +126,16 @@ export function WheelsHomeClient({
             <div>
               <h3>Just in Case</h3>
               <p>
-                Dom the Don briefcase sit-down. Choose 16:9 or 9:16 before entering, then use OBS overlay views from Owner Setup.
+                Public game — no login in TikTok/OBS. Open the public page, then copy overlay URLs
+                from Owner Setup (never paste a /dashboard link into Studio).
               </p>
             </div>
             <div className="btn-row wrap">
-              <Link className="btn gold" href="/just-in-case">
-                Play public
+              <Link className="btn gold" href="/just-in-case/vertical">
+                Open 9:16 public
               </Link>
-              <Link className="btn ghost" href="/dashboard/just-in-case">
-                Host + OBS links
+              <Link className="btn ghost" href="/just-in-case/widescreen">
+                Open 16:9 public
               </Link>
             </div>
           </article>

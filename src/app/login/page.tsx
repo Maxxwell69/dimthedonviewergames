@@ -72,6 +72,10 @@ export default function LoginPage() {
         <p className="auth-switch">
           New here? <a href="/register">Create an account</a>
         </p>
+        <p className="auth-switch">
+          Playing on stream? Use the{" "}
+          <a href="/just-in-case/vertical">public 9:16 game</a> (no login).
+        </p>
       </form>
     </main>
   );
