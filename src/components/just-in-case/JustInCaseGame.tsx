@@ -30,6 +30,14 @@ type SharedGame = {
 };
 
 export type JustInCaseVariant = "landscape" | "portrait";
+export type JustInCaseMode = "host" | "public";
+
+type OverlayPaths = {
+  cases: string;
+  player: string;
+  offer: string;
+  full: string;
+};
 
 const chips = (n: number) => `◆ ${Math.round(n).toLocaleString()}`;
 
@@ -59,14 +67,18 @@ function domsOffer(values: number[], round: number) {
 
 type JustInCaseGameProps = {
   variant?: JustInCaseVariant;
+  mode?: JustInCaseMode;
+  publicToken?: string;
 };
 
-export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
+export function JustInCaseGame({
+  variant = "landscape",
+  mode = "host",
+  publicToken,
+}: JustInCaseGameProps) {
+  const isPublic = mode === "public";
   const rootClass = variant === "portrait" ? "just-in-case-vertical" : "just-in-case";
-  const gameHref =
-    variant === "portrait"
-      ? "/dashboard/just-in-case/vertical"
-      : "/dashboard/just-in-case/widescreen";
+  const layoutKey = variant === "portrait" ? "vertical" : "widescreen";
 
   const [max, setMax] = useState(1_000_000);
   const [draft, setDraft] = useState(1_000_000);
@@ -82,8 +94,8 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
   const [revealing, setRevealing] = useState<number | null>(null);
   const [result, setResult] = useState("");
   const [setup, setSetup] = useState(false);
-  const [musicOn, setMusicOn] = useState(true);
-  const [fxOn, setFxOn] = useState(true);
+  const [musicOn, setMusicOn] = useState(!isPublic);
+  const [fxOn, setFxOn] = useState(!isPublic);
   const [music, setMusic] = useState<SoundFile>(null);
   const [offerSound, setOfferSound] = useState<SoundFile>(null);
   const [finalSound, setFinalSound] = useState<SoundFile>(null);
@@ -93,6 +105,10 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
   const musicTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [audioReady, setAudioReady] = useState(false);
   const [syncReady, setSyncReady] = useState(false);
+  const [syncToken, setSyncToken] = useState<string | null>(publicToken ?? null);
+  const [overlayPaths, setOverlayPaths] = useState<OverlayPaths | null>(null);
+  const [copyNote, setCopyNote] = useState<string | null>(null);
+  const applyingRemote = useRef(false);
 
   const remaining = useMemo(
     () => cases.filter((c) => !opened.includes(c.id)).map((c) => c.value),
@@ -116,6 +132,7 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
   }
 
   function applyShared(data: SharedGame) {
+    applyingRemote.current = true;
     setMax(data.max);
     setDraft(data.draft);
     setValues(data.values);
@@ -128,9 +145,13 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
     setOffer(data.offer);
     setResult(data.result);
     setRevealing(data.revealing);
+    queueMicrotask(() => {
+      applyingRemote.current = false;
+    });
   }
 
   useEffect(() => {
+    if (isPublic) return;
     const stored = localStorage.getItem(SYNC_KEY);
     if (stored) {
       try {
@@ -151,10 +172,10 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
     window.addEventListener("storage", onStorage);
     setSyncReady(true);
     return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  }, [isPublic]);
 
   useEffect(() => {
-    if (!syncReady) return;
+    if (isPublic || !syncReady) return;
     const shared: SharedGame = {
       max,
       draft,
@@ -171,7 +192,15 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
     };
     const json = JSON.stringify(shared);
     if (localStorage.getItem(SYNC_KEY) !== json) localStorage.setItem(SYNC_KEY, json);
+
+    if (applyingRemote.current) return;
+    void fetch("/api/just-in-case/state", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: json,
+    }).catch(() => {});
   }, [
+    isPublic,
     syncReady,
     max,
     draft,
@@ -186,6 +215,73 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
     result,
     revealing,
   ]);
+
+  useEffect(() => {
+    if (isPublic) return;
+    let cancelled = false;
+    void fetch("/api/just-in-case/session", { cache: "no-store" })
+      .then((res) => res.json())
+      .then(
+        (data: {
+          token?: string;
+          overlays?: { widescreen: OverlayPaths; vertical: OverlayPaths };
+        }) => {
+          if (cancelled || !data.token || !data.overlays) return;
+          setSyncToken(data.token);
+          setOverlayPaths(data.overlays[layoutKey]);
+        },
+      )
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isPublic, layoutKey]);
+
+  useEffect(() => {
+    if (!isPublic || !publicToken) return;
+    let source: EventSource | null = null;
+    let cancelled = false;
+
+    void fetch(`/api/just-in-case/${publicToken}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { state?: SharedGame | null }) => {
+        if (!cancelled && data.state) applyShared(data.state);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (cancelled) return;
+        source = new EventSource(`/api/just-in-case/${publicToken}/stream`);
+        source.addEventListener("state", (event) => {
+          try {
+            applyShared(JSON.parse((event as MessageEvent).data) as SharedGame);
+          } catch {
+            /* ignore bad stream payloads */
+          }
+        });
+      });
+
+    return () => {
+      cancelled = true;
+      source?.close();
+    };
+  }, [isPublic, publicToken]);
+
+  async function copyOverlay(path: string, label: string) {
+    const url = `${window.location.origin}${path}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyNote(`Copied ${label} URL`);
+    } catch {
+      setCopyNote(url);
+    }
+    window.setTimeout(() => setCopyNote(null), 2500);
+  }
+
+  function openPublicOverlay(view: Exclude<OverlayView, "full">) {
+    if (!overlayPaths) return;
+    const path = overlayPaths[view];
+    window.open(path, "_blank", "noopener,noreferrer");
+  }
 
   function context() {
     if (!audioCtx.current) {
@@ -308,14 +404,20 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
   }, [phase, offer]);
 
   function select(id: number) {
-    if (phase !== "choose") return;
+    if (isPublic || phase !== "choose") return;
     setReserved(id);
     setPhase("opening");
     sfx("select");
   }
 
   function open(id: number) {
-    if (phase !== "opening" || id === reserved || opened.includes(id) || revealing !== null)
+    if (
+      isPublic ||
+      phase !== "opening" ||
+      id === reserved ||
+      opened.includes(id) ||
+      revealing !== null
+    )
       return;
     setRevealing(id);
     sfx("open");
@@ -334,6 +436,7 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
   }
 
   function noDeal() {
+    if (isPublic) return;
     if (remaining.length <= 2) {
       setPhase("final");
       sfx("final");
@@ -351,6 +454,7 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
   }
 
   function deal() {
+    if (isPublic) return;
     setPhase("final");
     sfx("deal");
     setTimeout(() => {
@@ -360,6 +464,7 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
   }
 
   function reset(nextValues = values) {
+    if (isPublic) return;
     setCases(shuffle(nextValues));
     setReserved(null);
     setOpened([]);
@@ -373,6 +478,7 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
   }
 
   function save() {
+    if (isPublic) return;
     const safe = Math.max(100, Math.min(1e9, Math.round(draft || 100)));
     const next = ladder(safe);
     setMax(safe);
@@ -408,45 +514,48 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
       ? "/dashboard/just-in-case/widescreen"
       : "/dashboard/just-in-case/vertical";
   const otherLayoutLabel = variant === "portrait" ? "16:9 LAYOUT" : "9:16 LAYOUT";
+  const canInteract = !isPublic;
 
   return (
     <div className={rootClass}>
-      <main className={`game overlay-${overlay}`} onPointerDown={context}>
-        <div className="top-tools">
-          <div>
-            <Link className="admin-exit" href="/dashboard/just-in-case">
-              ← SIZE
-            </Link>
-            <Link className="admin-exit" href="/dashboard">
-              DASHBOARD
-            </Link>
-            <Link className="admin-exit" href={otherLayoutHref}>
-              {otherLayoutLabel}
-            </Link>
-            <button className={musicOn ? "on" : ""} onClick={() => setMusicOn((v) => !v)}>
-              ♫ MUSIC
-            </button>
-            <button className={fxOn ? "on" : ""} onClick={() => setFxOn((v) => !v)}>
-              🔊 FX
-            </button>
+      <main className={`game overlay-${overlay}`} onPointerDown={canInteract ? context : undefined}>
+        {!isPublic ? (
+          <div className="top-tools">
+            <div>
+              <Link className="admin-exit" href="/dashboard/just-in-case">
+                ← SIZE
+              </Link>
+              <Link className="admin-exit" href="/dashboard">
+                DASHBOARD
+              </Link>
+              <Link className="admin-exit" href={otherLayoutHref}>
+                {otherLayoutLabel}
+              </Link>
+              <button className={musicOn ? "on" : ""} onClick={() => setMusicOn((v) => !v)}>
+                ♫ MUSIC
+              </button>
+              <button className={fxOn ? "on" : ""} onClick={() => setFxOn((v) => !v)}>
+                🔊 FX
+              </button>
+            </div>
+            <div>
+              <button
+                className="restart"
+                onClick={() => reset()}
+                title="Shuffle all briefcases and start over"
+              >
+                ↻ RESTART GAME
+              </button>
+              <button onClick={() => setSetup(true)}>⚙ OWNER SETUP</button>
+            </div>
           </div>
-          <div>
-            <button
-              className="restart"
-              onClick={() => reset()}
-              title="Shuffle all briefcases and start over"
-            >
-              ↻ RESTART GAME
-            </button>
-            <button onClick={() => setSetup(true)}>⚙ OWNER SETUP</button>
-          </div>
-        </div>
+        ) : null}
 
-        {overlay !== "full" && (
+        {!isPublic && overlay !== "full" ? (
           <button className="overlay-exit" onClick={() => setView("full")}>
             ← FULL GAME
           </button>
-        )}
+        ) : null}
 
         <header>
           <div className="round">SIT-DOWN {round + 1}</div>
@@ -503,7 +612,11 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
                   opened={opened.includes(c.id)}
                   hidden={c.id === reserved}
                   revealing={revealing === c.id}
-                  onClick={() => (phase === "choose" ? select(c.id) : open(c.id))}
+                  onClick={
+                    canInteract
+                      ? () => (phase === "choose" ? select(c.id) : open(c.id))
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -534,10 +647,18 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
                 TOP CASE<strong>{chips(top)}</strong>
               </span>
             </div>
-            <button className="take" disabled={phase !== "offer"} onClick={deal}>
+            <button
+              className="take"
+              disabled={!canInteract || phase !== "offer"}
+              onClick={deal}
+            >
               TAKE THE DEAL
             </button>
-            <button className="walk" disabled={phase !== "offer"} onClick={noDeal}>
+            <button
+              className="walk"
+              disabled={!canInteract || phase !== "offer"}
+              onClick={noDeal}
+            >
               NO DEAL
             </button>
           </aside>
@@ -558,12 +679,12 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
               ? "DOM ALWAYS SETTLES THE BOOKS"
               : `MAXIMUM CASE ${chips(max)}`}
           </p>
-          {phase === "finished" && (
+          {phase === "finished" && canInteract ? (
             <button onClick={() => reset()}>ANOTHER SIT-DOWN</button>
-          )}
+          ) : null}
         </footer>
 
-        {setup && (
+        {setup && !isPublic ? (
           <div className="modal-bg">
             <div className="modal panel">
               <button className="close" onClick={() => setSetup(false)}>
@@ -598,50 +719,64 @@ export function JustInCaseGame({ variant = "landscape" }: JustInCaseGameProps) {
                 onFile={(f) => file("final", f)}
               />
               <div className="overlay-admin">
-                <h3>OBS OVERLAY VIEWS</h3>
+                <h3>PUBLIC OBS OVERLAY URLS</h3>
                 <p>
-                  Open one clean game box at a time. Copy the browser address after opening a view
-                  and use it as that OBS browser source. Overlays sync through this browser profile.
+                  These links are public (no login). Paste them into OBS browser sources. They stay
+                  synced while you run the game from this host page.
                 </p>
-                <p className="overlay-url-hint">
-                  Base URL: <code>{gameHref}</code>
-                </p>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSetup(false);
-                      setView("cases");
-                    }}
-                  >
-                    BRIEFCASES
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSetup(false);
-                      setView("player");
-                    }}
-                  >
-                    YOUR CASE
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSetup(false);
-                      setView("offer");
-                    }}
-                  >
-                    DOM’S OFFER
-                  </button>
-                </div>
+                {overlayPaths ? (
+                  <>
+                    <p className="overlay-url-hint">
+                      Public full game: <code>{overlayPaths.full}</code>
+                    </p>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => void copyOverlay(overlayPaths.cases, "Briefcases")}
+                      >
+                        COPY BRIEFCASES
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void copyOverlay(overlayPaths.player, "Your Case")}
+                      >
+                        COPY YOUR CASE
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void copyOverlay(overlayPaths.offer, "Dom’s Offer")}
+                      >
+                        COPY DOM’S OFFER
+                      </button>
+                    </div>
+                    <div>
+                      <button type="button" onClick={() => openPublicOverlay("cases")}>
+                        OPEN BRIEFCASES
+                      </button>
+                      <button type="button" onClick={() => openPublicOverlay("player")}>
+                        OPEN YOUR CASE
+                      </button>
+                      <button type="button" onClick={() => openPublicOverlay("offer")}>
+                        OPEN DOM’S OFFER
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="overlay-url-hint">Loading public overlay links…</p>
+                )}
+                {syncToken ? (
+                  <p className="overlay-url-hint">
+                    Overlay token: <code>{syncToken}</code>
+                  </p>
+                ) : null}
+                {copyNote ? <p className="overlay-url-hint">{copyNote}</p> : null}
               </div>
               <button className="save" onClick={save}>
                 SAVE & START THE SIT-DOWN
               </button>
             </div>
           </div>
-        )}
+        ) : null}
       </main>
     </div>
   );

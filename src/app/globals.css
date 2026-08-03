@@ -638,6 +638,15 @@ html.overlay-mode #__next,
   aspect-ratio: 9 / 16;
 }
 
+.overlay-path {
+  word-break: break-all;
+  font-size: 0.78rem !important;
+}
+
+.btn-row.wrap {
+  flex-wrap: wrap;
+}
+
 .create-wheel-panel {
   margin-bottom: 1.5rem;
 }
