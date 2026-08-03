@@ -5,13 +5,13 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Just in Case 16:9 · Dom the Don",
-  description: "Admin-only widescreen Just in Case sit-down game with OBS overlays",
+  title: "Just in Case 16:9 Host · Dom the Don",
+  description: "Operator host for widescreen Just in Case",
 };
 
 export default async function JustInCaseWidescreenPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  return <JustInCaseLandscape />;
+  return <JustInCaseLandscape mode="host" />;
 }

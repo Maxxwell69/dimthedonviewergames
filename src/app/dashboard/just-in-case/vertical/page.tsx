@@ -5,13 +5,13 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Just in Case 9:16 · Dom the Don",
-  description: "Admin-only vertical TikTok Just in Case sit-down game with OBS overlays",
+  title: "Just in Case 9:16 Host · Dom the Don",
+  description: "Operator host for vertical Just in Case",
 };
 
 export default async function JustInCaseVerticalPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  return <JustInCasePortrait />;
+  return <JustInCasePortrait mode="host" />;
 }

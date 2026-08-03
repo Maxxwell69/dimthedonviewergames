@@ -20,12 +20,17 @@ type SessionPayload = {
   error?: string;
 };
 
-export function JustInCaseSizeChooser() {
+type Props = {
+  publicAccess?: boolean;
+};
+
+export function JustInCaseSizeChooser({ publicAccess = false }: Props) {
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (publicAccess) return;
     let cancelled = false;
     void fetch("/api/just-in-case/session", { cache: "no-store" })
       .then((res) => res.json())
@@ -38,7 +43,7 @@ export function JustInCaseSizeChooser() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [publicAccess]);
 
   async function copy(path: string, label: string) {
     const url = `${window.location.origin}${path}`;
@@ -76,15 +81,19 @@ export function JustInCaseSizeChooser() {
       <div className="home-top">
         <BrandHeader compact showBanner={false} />
         <div className="home-user">
-          <Link className="btn ghost" href="/dashboard">
-            ← Back to dashboard
+          <Link className="btn ghost" href={publicAccess ? "/" : "/dashboard"}>
+            {publicAccess ? "← Home" : "← Back to dashboard"}
           </Link>
         </div>
       </div>
 
       <header className="home-hero">
         <h1>Just in Case</h1>
-        <p>Choose the game size before you enter. Public OBS overlays are listed below.</p>
+        <p>
+          {publicAccess
+            ? "No login needed. Choose a size and play — OBS overlay links are created inside the game."
+            : "Choose the game size before you enter. Public OBS overlays are listed below."}
+        </p>
       </header>
 
       <section className="panel studio-games-panel">
@@ -99,8 +108,8 @@ export function JustInCaseSizeChooser() {
               <h3>16:9 Widescreen</h3>
               <p>Desktop host view and landscape OBS. Best for monitor / horizontal canvases.</p>
             </div>
-            <Link className="btn gold" href="/dashboard/just-in-case/widescreen">
-              Enter 16:9 host
+            <Link className="btn gold" href="/just-in-case/widescreen">
+              Play 16:9
             </Link>
           </article>
 
@@ -112,94 +121,101 @@ export function JustInCaseSizeChooser() {
               <h3>9:16 Vertical</h3>
               <p>TikTok / phone portrait OBS. Best for vertical live canvases.</p>
             </div>
-            <Link className="btn gold" href="/dashboard/just-in-case/vertical">
-              Enter 9:16 host
+            <Link className="btn gold" href="/just-in-case/vertical">
+              Play 9:16
             </Link>
           </article>
         </div>
       </section>
 
-      <section className="panel studio-games-panel">
-        <h2>Public OBS overlays</h2>
-        <p className="hint">
-          No login required. Paste these into OBS browser sources. They sync from your host game
-          page.
-        </p>
+      {!publicAccess ? (
+        <section className="panel studio-games-panel">
+          <h2>Public OBS overlays</h2>
+          <p className="hint">
+            No login required. Paste these into OBS browser sources. They sync from your host game
+            page.
+          </p>
 
-        {!session ? <p className="hint">Loading public links…</p> : null}
-        {session?.error ? <p className="hint">{session.error}</p> : null}
+          {!session ? <p className="hint">Loading public links…</p> : null}
+          {session?.error ? <p className="hint">{session.error}</p> : null}
 
-        {session?.overlays ? (
-          <div className="studio-games-grid size-chooser-grid">
-            <article className="studio-game-card">
-              <div>
-                <h3>16:9 public links</h3>
-                <p className="hint overlay-path">{session.overlays.widescreen.full}</p>
-              </div>
-              <div className="btn-row wrap">
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => void copy(session.overlays!.widescreen.cases, "16:9 briefcases")}
-                >
-                  Copy briefcases
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => void copy(session.overlays!.widescreen.player, "16:9 your case")}
-                >
-                  Copy your case
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => void copy(session.overlays!.widescreen.offer, "16:9 offer")}
-                >
-                  Copy Dom’s offer
-                </button>
-              </div>
-            </article>
+          {session?.overlays ? (
+            <div className="studio-games-grid size-chooser-grid">
+              <article className="studio-game-card">
+                <div>
+                  <h3>16:9 public links</h3>
+                  <p className="hint overlay-path">{session.overlays.widescreen.full}</p>
+                </div>
+                <div className="btn-row wrap">
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => void copy(session.overlays!.widescreen.cases, "16:9 briefcases")}
+                  >
+                    Copy briefcases
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => void copy(session.overlays!.widescreen.player, "16:9 your case")}
+                  >
+                    Copy your case
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => void copy(session.overlays!.widescreen.offer, "16:9 offer")}
+                  >
+                    Copy Dom’s offer
+                  </button>
+                </div>
+              </article>
 
-            <article className="studio-game-card">
-              <div>
-                <h3>9:16 public links</h3>
-                <p className="hint overlay-path">{session.overlays.vertical.full}</p>
-              </div>
-              <div className="btn-row wrap">
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => void copy(session.overlays!.vertical.cases, "9:16 briefcases")}
-                >
-                  Copy briefcases
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => void copy(session.overlays!.vertical.player, "9:16 your case")}
-                >
-                  Copy your case
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => void copy(session.overlays!.vertical.offer, "9:16 offer")}
-                >
-                  Copy Dom’s offer
-                </button>
-              </div>
-            </article>
+              <article className="studio-game-card">
+                <div>
+                  <h3>9:16 public links</h3>
+                  <p className="hint overlay-path">{session.overlays.vertical.full}</p>
+                </div>
+                <div className="btn-row wrap">
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => void copy(session.overlays!.vertical.cases, "9:16 briefcases")}
+                  >
+                    Copy briefcases
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => void copy(session.overlays!.vertical.player, "9:16 your case")}
+                  >
+                    Copy your case
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => void copy(session.overlays!.vertical.offer, "9:16 offer")}
+                  >
+                    Copy Dom’s offer
+                  </button>
+                </div>
+              </article>
+            </div>
+          ) : null}
+
+          <div className="btn-row" style={{ marginTop: "1rem" }}>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy}
+              onClick={() => void rotateLinks()}
+            >
+              Rotate public links
+            </button>
           </div>
-        ) : null}
-
-        <div className="btn-row" style={{ marginTop: "1rem" }}>
-          <button type="button" className="btn ghost" disabled={busy} onClick={() => void rotateLinks()}>
-            Rotate public links
-          </button>
-        </div>
-        {note ? <p className="hint">{note}</p> : null}
-      </section>
+          {note ? <p className="hint">{note}</p> : null}
+        </section>
+      ) : null}
     </div>
   );
 }

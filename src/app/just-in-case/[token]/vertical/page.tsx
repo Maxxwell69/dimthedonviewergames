@@ -1,20 +1,31 @@
 import { JustInCasePortrait } from "@/components/just-in-case/JustInCasePortrait";
-import { getJustInCaseOwner } from "@/lib/just-in-case-sync";
-import { notFound } from "next/navigation";
+import { ensurePublicJustInCaseRoom } from "@/lib/just-in-case-sync";
 
 export const dynamic = "force-dynamic";
 
-type Props = { params: Promise<{ token: string }> };
+type Props = {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ overlay?: string }>;
+};
 
 export const metadata = {
   title: "Just in Case Overlay · 9:16",
-  description: "Public OBS overlay for Just in Case vertical",
+  description: "Public Just in Case vertical / OBS overlay",
 };
 
-export default async function PublicJustInCaseVerticalPage({ params }: Props) {
+export default async function PublicJustInCaseVerticalPage({
+  params,
+  searchParams,
+}: Props) {
   const { token } = await params;
-  const owner = await getJustInCaseOwner(token);
-  if (!owner) notFound();
+  const { overlay } = await searchParams;
+  ensurePublicJustInCaseRoom(token);
+  const isOverlay = overlay === "cases" || overlay === "player" || overlay === "offer";
 
-  return <JustInCasePortrait mode="public" publicToken={token} />;
+  return (
+    <JustInCasePortrait
+      mode={isOverlay ? "viewer" : "open"}
+      publicToken={token}
+    />
+  );
 }

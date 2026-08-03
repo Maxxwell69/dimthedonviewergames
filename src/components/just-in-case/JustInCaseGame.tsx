@@ -30,7 +30,10 @@ type SharedGame = {
 };
 
 export type JustInCaseVariant = "landscape" | "portrait";
-export type JustInCaseMode = "host" | "public";
+/** host = dashboard operator; open = public playable; viewer = public overlay follow */
+export type JustInCaseMode = "host" | "open" | "viewer";
+
+const ROOM_KEY = "dom-the-don-public-room-v1";
 
 type OverlayPaths = {
   cases: string;
@@ -76,9 +79,10 @@ export function JustInCaseGame({
   mode = "host",
   publicToken,
 }: JustInCaseGameProps) {
-  const isPublic = mode === "public";
   const rootClass = variant === "portrait" ? "just-in-case-vertical" : "just-in-case";
   const layoutKey = variant === "portrait" ? "vertical" : "widescreen";
+  const isHost = mode === "host";
+  const isViewerMode = mode === "viewer";
 
   const [max, setMax] = useState(1_000_000);
   const [draft, setDraft] = useState(1_000_000);
@@ -94,8 +98,8 @@ export function JustInCaseGame({
   const [revealing, setRevealing] = useState<number | null>(null);
   const [result, setResult] = useState("");
   const [setup, setSetup] = useState(false);
-  const [musicOn, setMusicOn] = useState(!isPublic);
-  const [fxOn, setFxOn] = useState(!isPublic);
+  const [musicOn, setMusicOn] = useState(!isViewerMode);
+  const [fxOn, setFxOn] = useState(!isViewerMode);
   const [music, setMusic] = useState<SoundFile>(null);
   const [offerSound, setOfferSound] = useState<SoundFile>(null);
   const [finalSound, setFinalSound] = useState<SoundFile>(null);
@@ -117,6 +121,11 @@ export function JustInCaseGame({
   const target = ROUNDS[Math.min(round, ROUNDS.length - 1)];
   const mine = cases.find((c) => c.id === reserved);
   const top = Math.max(...remaining);
+
+  const isOverlayView =
+    overlay === "cases" || overlay === "player" || overlay === "offer";
+  const isViewer = isViewerMode || isOverlayView;
+  const canInteract = !isViewer;
 
   useEffect(() => {
     const view = new URLSearchParams(window.location.search).get("overlay");
@@ -151,7 +160,7 @@ export function JustInCaseGame({
   }
 
   useEffect(() => {
-    if (isPublic) return;
+    if (isViewer) return;
     const stored = localStorage.getItem(SYNC_KEY);
     if (stored) {
       try {
@@ -172,10 +181,10 @@ export function JustInCaseGame({
     window.addEventListener("storage", onStorage);
     setSyncReady(true);
     return () => window.removeEventListener("storage", onStorage);
-  }, [isPublic]);
+  }, [isViewer]);
 
   useEffect(() => {
-    if (isPublic || !syncReady) return;
+    if (isViewer || !syncReady || !syncToken) return;
     const shared: SharedGame = {
       max,
       draft,
@@ -194,14 +203,19 @@ export function JustInCaseGame({
     if (localStorage.getItem(SYNC_KEY) !== json) localStorage.setItem(SYNC_KEY, json);
 
     if (applyingRemote.current) return;
-    void fetch("/api/just-in-case/state", {
+    const endpoint = isHost
+      ? "/api/just-in-case/state"
+      : `/api/just-in-case/${syncToken}/state`;
+    void fetch(endpoint, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: json,
     }).catch(() => {});
   }, [
-    isPublic,
+    isViewer,
+    isHost,
     syncReady,
+    syncToken,
     max,
     draft,
     values,
@@ -217,54 +231,72 @@ export function JustInCaseGame({
   ]);
 
   useEffect(() => {
-    if (isPublic) return;
     let cancelled = false;
-    void fetch("/api/just-in-case/session", { cache: "no-store" })
-      .then((res) => res.json())
-      .then(
-        (data: {
+
+    async function boot() {
+      if (isViewer && publicToken) {
+        setSyncToken(publicToken);
+        const res = await fetch(`/api/just-in-case/${publicToken}`, { cache: "no-store" });
+        const data = (await res.json().catch(() => ({}))) as { state?: SharedGame | null };
+        if (!cancelled && data.state) applyShared(data.state);
+        return;
+      }
+
+      if (isHost) {
+        const res = await fetch("/api/just-in-case/session", { cache: "no-store" });
+        const data = (await res.json().catch(() => ({}))) as {
           token?: string;
           overlays?: { widescreen: OverlayPaths; vertical: OverlayPaths };
-        }) => {
-          if (cancelled || !data.token || !data.overlays) return;
-          setSyncToken(data.token);
-          setOverlayPaths(data.overlays[layoutKey]);
-        },
-      )
-      .catch(() => {});
+        };
+        if (cancelled || !data.token || !data.overlays) return;
+        setSyncToken(data.token);
+        setOverlayPaths(data.overlays[layoutKey]);
+        return;
+      }
+
+      // Public open game: reuse local room or create one (no login).
+      const existing =
+        publicToken ||
+        new URLSearchParams(window.location.search).get("room") ||
+        localStorage.getItem(ROOM_KEY);
+      const res = await fetch("/api/just-in-case/room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: existing || undefined }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        token?: string;
+        overlays?: { widescreen: OverlayPaths; vertical: OverlayPaths };
+      };
+      if (cancelled || !data.token || !data.overlays) return;
+      localStorage.setItem(ROOM_KEY, data.token);
+      setSyncToken(data.token);
+      setOverlayPaths(data.overlays[layoutKey]);
+      const next = new URL(window.location.href);
+      if (!next.pathname.includes(`/${data.token}/`)) {
+        next.pathname = `/just-in-case/${data.token}/${layoutKey}`;
+        window.history.replaceState({}, "", next);
+      }
+    }
+
+    void boot().catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [isPublic, layoutKey]);
+  }, [isHost, isViewer, publicToken, layoutKey]);
 
   useEffect(() => {
-    if (!isPublic || !publicToken) return;
-    let source: EventSource | null = null;
-    let cancelled = false;
-
-    void fetch(`/api/just-in-case/${publicToken}`, { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data: { state?: SharedGame | null }) => {
-        if (!cancelled && data.state) applyShared(data.state);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (cancelled) return;
-        source = new EventSource(`/api/just-in-case/${publicToken}/stream`);
-        source.addEventListener("state", (event) => {
-          try {
-            applyShared(JSON.parse((event as MessageEvent).data) as SharedGame);
-          } catch {
-            /* ignore bad stream payloads */
-          }
-        });
-      });
-
-    return () => {
-      cancelled = true;
-      source?.close();
-    };
-  }, [isPublic, publicToken]);
+    if (!isViewer || !syncToken) return;
+    const source = new EventSource(`/api/just-in-case/${syncToken}/stream`);
+    source.addEventListener("state", (event) => {
+      try {
+        applyShared(JSON.parse((event as MessageEvent).data) as SharedGame);
+      } catch {
+        /* ignore bad stream payloads */
+      }
+    });
+    return () => source.close();
+  }, [isViewer, syncToken]);
 
   async function copyOverlay(path: string, label: string) {
     const url = `${window.location.origin}${path}`;
@@ -404,7 +436,7 @@ export function JustInCaseGame({
   }, [phase, offer]);
 
   function select(id: number) {
-    if (isPublic || phase !== "choose") return;
+    if (!canInteract || phase !== "choose") return;
     setReserved(id);
     setPhase("opening");
     sfx("select");
@@ -412,7 +444,7 @@ export function JustInCaseGame({
 
   function open(id: number) {
     if (
-      isPublic ||
+      !canInteract ||
       phase !== "opening" ||
       id === reserved ||
       opened.includes(id) ||
@@ -436,7 +468,7 @@ export function JustInCaseGame({
   }
 
   function noDeal() {
-    if (isPublic) return;
+    if (!canInteract) return;
     if (remaining.length <= 2) {
       setPhase("final");
       sfx("final");
@@ -454,7 +486,7 @@ export function JustInCaseGame({
   }
 
   function deal() {
-    if (isPublic) return;
+    if (!canInteract) return;
     setPhase("final");
     sfx("deal");
     setTimeout(() => {
@@ -464,7 +496,7 @@ export function JustInCaseGame({
   }
 
   function reset(nextValues = values) {
-    if (isPublic) return;
+    if (!canInteract) return;
     setCases(shuffle(nextValues));
     setReserved(null);
     setOpened([]);
@@ -478,7 +510,7 @@ export function JustInCaseGame({
   }
 
   function save() {
-    if (isPublic) return;
+    if (!canInteract) return;
     const safe = Math.max(100, Math.min(1e9, Math.round(draft || 100)));
     const next = ladder(safe);
     setMax(safe);
@@ -510,24 +542,23 @@ export function JustInCaseGame({
             : "The sit-down is over";
 
   const otherLayoutHref =
-    variant === "portrait"
-      ? "/dashboard/just-in-case/widescreen"
-      : "/dashboard/just-in-case/vertical";
+    variant === "portrait" ? "/just-in-case/widescreen" : "/just-in-case/vertical";
   const otherLayoutLabel = variant === "portrait" ? "16:9 LAYOUT" : "9:16 LAYOUT";
-  const canInteract = !isPublic;
 
   return (
     <div className={rootClass}>
       <main className={`game overlay-${overlay}`} onPointerDown={canInteract ? context : undefined}>
-        {!isPublic ? (
+        {canInteract ? (
           <div className="top-tools">
             <div>
-              <Link className="admin-exit" href="/dashboard/just-in-case">
+              <Link className="admin-exit" href="/just-in-case">
                 ← SIZE
               </Link>
-              <Link className="admin-exit" href="/dashboard">
-                DASHBOARD
-              </Link>
+              {isHost ? (
+                <Link className="admin-exit" href="/dashboard">
+                  DASHBOARD
+                </Link>
+              ) : null}
               <Link className="admin-exit" href={otherLayoutHref}>
                 {otherLayoutLabel}
               </Link>
@@ -551,19 +582,11 @@ export function JustInCaseGame({
           </div>
         ) : null}
 
-        {!isPublic && overlay !== "full" ? (
+        {canInteract && overlay !== "full" ? (
           <button className="overlay-exit" onClick={() => setView("full")}>
             ← FULL GAME
           </button>
         ) : null}
-
-        <header>
-          <div className="brand">
-            <small>DOM THE DON PRESENTS</small>
-            <h1>JUST IN CASE</h1>
-            <p>EVERY CHOICE HAS A PRICE</p>
-          </div>
-        </header>
 
         <section className="board">
           <aside className="player panel">
@@ -667,7 +690,7 @@ export function JustInCaseGame({
           ) : null}
         </footer>
 
-        {setup && !isPublic ? (
+        {setup && canInteract ? (
           <div className="modal-bg">
             <div className="modal panel">
               <button className="close" onClick={() => setSetup(false)}>

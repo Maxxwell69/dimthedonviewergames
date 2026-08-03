@@ -1,6 +1,6 @@
 import {
-  getJustInCaseOwner,
   getJustInCaseState,
+  justInCaseRoomExists,
   subscribeJustInCase,
 } from "@/lib/just-in-case-sync";
 
@@ -11,8 +11,7 @@ export const runtime = "nodejs";
 
 export async function GET(_req: Request, { params }: Params) {
   const { token } = await params;
-  const owner = await getJustInCaseOwner(token);
-  if (!owner) {
+  if (!(await justInCaseRoomExists(token))) {
     return new Response("Not found", { status: 404 });
   }
 

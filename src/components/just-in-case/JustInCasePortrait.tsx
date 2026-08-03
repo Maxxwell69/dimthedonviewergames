@@ -8,6 +8,6 @@ type Props = {
   publicToken?: string;
 };
 
-export function JustInCasePortrait({ mode = "host", publicToken }: Props) {
+export function JustInCasePortrait({ mode = "open", publicToken }: Props) {
   return <JustInCaseGame variant="portrait" mode={mode} publicToken={publicToken} />;
 }

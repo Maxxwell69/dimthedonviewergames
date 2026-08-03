@@ -8,6 +8,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
+/** Authenticated host publish (dashboard). */
 export async function PUT(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {

@@ -129,9 +129,14 @@ export function WheelsHomeClient({
                 Dom the Don briefcase sit-down. Choose 16:9 or 9:16 before entering, then use OBS overlay views from Owner Setup.
               </p>
             </div>
-            <Link className="btn gold" href="/dashboard/just-in-case">
-              Choose size &amp; open
-            </Link>
+            <div className="btn-row wrap">
+              <Link className="btn gold" href="/just-in-case">
+                Play public
+              </Link>
+              <Link className="btn ghost" href="/dashboard/just-in-case">
+                Host + OBS links
+              </Link>
+            </div>
           </article>
         </div>
       </section>

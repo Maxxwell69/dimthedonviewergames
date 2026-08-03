@@ -96,14 +96,7 @@
 .just-in-case-vertical .top-tools .on{ color: var(--gold); border-color: #ae8340; }
 .just-in-case-vertical .top-tools .restart{ color: #f0cd78; background: linear-gradient(#30210e, #080a08); }
 
-.just-in-case-vertical header{
-  height: 79px;
-  display: grid;
-  grid-template-columns: 1fr;
-  align-items: center;
-  justify-items: center;
-  border-radius: 8px 8px 2px 2px;
-}
+.just-in-case-vertical header{ display: none; }
 .just-in-case-vertical .round{
   padding: 12px 3px;
   text-align: center;
@@ -409,7 +402,6 @@
 @media (max-width: 390px) {
   .just-in-case-vertical .game{ padding-top: 46px; }
   .just-in-case-vertical .top-tools button{ padding-inline: 4px; font-size: 7px; }
-  .just-in-case-vertical header{ grid-template-columns: 1fr; }
   .just-in-case-vertical .brand h1{ font-size: 27px; }
   .just-in-case-vertical .player, .just-in-case-vertical .dom{ min-height: 205px; }
   .just-in-case-vertical .cases{ grid-template-rows: repeat(5, 61px); gap: 7px 5px; padding-inline: 8px; }

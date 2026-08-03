@@ -205,11 +205,7 @@
   align-self: center;
 }
 
-/* Header/footer without side status panels */
-.just-in-case header {
-  grid-template-columns: 1fr !important;
-  justify-items: center;
-}
+/* Footer without side status panels */
 .just-in-case footer {
   display: flex !important;
   align-items: center;
@@ -219,5 +215,8 @@
 .just-in-case footer p {
   margin-left: 0 !important;
   text-align: center;
+}
+.just-in-case .board {
+  min-height: calc(100vh - 90px) !important;
 }
 

@@ -25,9 +25,22 @@ export type JustInCaseSharedGame = {
 };
 
 const states = new Map<string, JustInCaseSharedGame>();
+const publicRooms = new Set<string>();
 
 export function justInCaseChannel(token: string) {
   return `just-in-case:${token}`;
+}
+
+export function createPublicJustInCaseRoom() {
+  const token = nanoid(24);
+  publicRooms.add(token);
+  return token;
+}
+
+export function ensurePublicJustInCaseRoom(token: string) {
+  if (!token || token.length < 8) return null;
+  publicRooms.add(token);
+  return token;
 }
 
 export async function getOrCreateJustInCaseToken(userId: string) {
@@ -35,13 +48,17 @@ export async function getOrCreateJustInCaseToken(userId: string) {
     where: { id: userId },
     select: { justInCaseToken: true },
   });
-  if (existing?.justInCaseToken) return existing.justInCaseToken;
+  if (existing?.justInCaseToken) {
+    publicRooms.add(existing.justInCaseToken);
+    return existing.justInCaseToken;
+  }
 
   const token = nanoid(24);
   await prisma.user.update({
     where: { id: userId },
     data: { justInCaseToken: token },
   });
+  publicRooms.add(token);
   return token;
 }
 
@@ -52,6 +69,7 @@ export async function rotateJustInCaseToken(userId: string) {
   });
   if (previous?.justInCaseToken) {
     states.delete(previous.justInCaseToken);
+    publicRooms.delete(previous.justInCaseToken);
   }
 
   const token = nanoid(24);
@@ -59,15 +77,21 @@ export async function rotateJustInCaseToken(userId: string) {
     where: { id: userId },
     data: { justInCaseToken: token },
   });
+  publicRooms.add(token);
   return token;
 }
 
-export async function getJustInCaseOwner(token: string) {
+export async function justInCaseRoomExists(token: string) {
+  if (publicRooms.has(token)) return true;
   const user = await prisma.user.findUnique({
     where: { justInCaseToken: token },
     select: { id: true },
   });
-  return user?.id ?? null;
+  if (user) {
+    publicRooms.add(token);
+    return true;
+  }
+  return false;
 }
 
 export function getJustInCaseState(token: string) {
@@ -75,6 +99,7 @@ export function getJustInCaseState(token: string) {
 }
 
 export function setJustInCaseState(token: string, state: JustInCaseSharedGame) {
+  publicRooms.add(token);
   states.set(token, state);
   publish(justInCaseChannel(token), state);
 }
