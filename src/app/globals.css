@@ -566,6 +566,43 @@ html.overlay-mode #__next,
   max-width: 42rem;
 }
 
+.studio-games-panel {
+  margin-bottom: 1.5rem;
+}
+
+.studio-games-panel > .hint {
+  margin: 0.35rem 0 1rem;
+}
+
+.studio-games-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.studio-game-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.studio-game-card h3 {
+  margin: 0 0 0.35rem;
+  font-family: Cinzel, Georgia, serif;
+  color: var(--gold-light);
+  font-size: 1.05rem;
+}
+
+.studio-game-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .create-wheel-panel {
   margin-bottom: 1.5rem;
 }

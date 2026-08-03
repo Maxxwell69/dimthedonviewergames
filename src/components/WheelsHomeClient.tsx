@@ -116,6 +116,24 @@ export function WheelsHomeClient({
         <p>Create multiple giveaway wheels, design each one, and activate the ones you&apos;re running live.</p>
       </header>
 
+      <section className="panel studio-games-panel">
+        <h2>Studio games</h2>
+        <p className="hint">
+          Operator-only games. These run separately from your wheels and never touch wheel entries or display URLs.
+        </p>
+        <div className="studio-games-grid">
+          <article className="studio-game-card">
+            <div>
+              <h3>Just in Case</h3>
+              <p>Dom the Don briefcase sit-down — pick a case, open the rest, take or walk Dom&apos;s offer.</p>
+            </div>
+            <Link className="btn gold" href="/dashboard/just-in-case">
+              Open game
+            </Link>
+          </article>
+        </div>
+      </section>
+
       <section className="panel create-wheel-panel">
         <h2>New wheel</h2>
         <form className="create-wheel-form" onSubmit={onCreate}>
