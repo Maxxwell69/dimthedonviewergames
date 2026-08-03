@@ -296,13 +296,14 @@
 .just-in-case-vertical .briefcase:hover:not(:disabled), .just-in-case-vertical .briefcase:focus-visible{ transform: translateY(-3px) scale(1.02); filter: brightness(1.3); }
 .just-in-case-vertical .briefcase span{
   position: absolute;
-  inset: 13%;
+  inset: 6%;
   display: grid;
   place-items: center;
   border: 1px solid #a47c39;
-  font-size: 22px;
+  font-size: 30px;
   font-weight: 900;
   text-shadow: 0 2px #000;
+  line-height: 1;
 }
 .just-in-case-vertical .handle{
   position: absolute;
@@ -322,9 +323,15 @@
   transform: rotateX(-8deg);
   animation: caseOpen .65s ease;
 }
-.just-in-case-vertical .briefcase.opened{ opacity: .4; }
+.just-in-case-vertical .briefcase.opened{ opacity: 1; filter: brightness(1.18); }
 .just-in-case-vertical .briefcase.opened.selected{ opacity: 1; animation: finalOpen 1.75s cubic-bezier(.2,.8,.25,1); }
-.just-in-case-vertical .briefcase.opened span, .just-in-case-vertical .briefcase.revealing span{ font-size: 9px; text-shadow: none; }
+.just-in-case-vertical .briefcase.opened span, .just-in-case-vertical .briefcase.revealing span{
+  font-size: 18px;
+  font-weight: 900;
+  color: #1a0f04;
+  text-shadow: 0 1px 0 #fff6c8;
+  line-height: 1;
+}
 .just-in-case-vertical .briefcase.selected{ width: 92%; height: 71px; margin: 2px auto; }
 .just-in-case-vertical .brief-slot{
   display: grid;
@@ -338,7 +345,7 @@
 }
 
 .just-in-case-vertical .prizes{
-  min-height: 101px;
+  min-height: 118px;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-template-rows: repeat(4, 1fr);
@@ -349,14 +356,14 @@
 }
 .just-in-case-vertical .prizes span{
   min-width: 0;
-  padding: 5px 1px;
+  padding: 7px 1px;
   overflow: hidden;
   text-align: center;
   white-space: nowrap;
   background: #091713;
   border: 1px solid #98753c;
   color: #e8c978;
-  font: 800 7px Arial, sans-serif;
+  font: 800 11px Arial, sans-serif;
 }
 .just-in-case-vertical .prizes .gone{ opacity: .2; text-decoration: line-through; }
 .just-in-case-vertical .prizes .top{ background: #704f18; color: #fff0b5; box-shadow: 0 0 10px #d5a44666; }
@@ -422,7 +429,7 @@
   .just-in-case-vertical .player, .just-in-case-vertical .dom{ min-height: 205px; }
   .just-in-case-vertical .cases{ grid-template-rows: repeat(5, 61px); gap: 7px 5px; padding-inline: 8px; }
   .just-in-case-vertical .stage{ min-height: 517px; }
-  .just-in-case-vertical .briefcase span{ font-size: 19px; }
+  .just-in-case-vertical .briefcase span{ font-size: 26px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
