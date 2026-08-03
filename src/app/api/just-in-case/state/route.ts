@@ -21,6 +21,6 @@ export async function PUT(req: Request) {
   }
 
   const token = await getOrCreateJustInCaseToken(session.user.id);
-  setJustInCaseState(token, body);
-  return NextResponse.json({ ok: true, token });
+  const updatedAt = await setJustInCaseState(token, body);
+  return NextResponse.json({ ok: true, token, updatedAt });
 }

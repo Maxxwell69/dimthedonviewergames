@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  getJustInCaseState,
+  getJustInCaseSnapshot,
   justInCaseRoomExists,
 } from "@/lib/just-in-case-sync";
 
@@ -14,8 +14,10 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({
-    token,
-    state: getJustInCaseState(token),
+  const snapshot = await getJustInCaseSnapshot(token);
+  return NextResponse.json(snapshot, {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
   });
 }

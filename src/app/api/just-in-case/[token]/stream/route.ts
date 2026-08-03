@@ -1,5 +1,5 @@
 import {
-  getJustInCaseState,
+  getJustInCaseSnapshot,
   justInCaseRoomExists,
   subscribeJustInCase,
 } from "@/lib/just-in-case-sync";
@@ -27,9 +27,15 @@ export async function GET(_req: Request, { params }: Params) {
         );
       };
 
-      send("ready", { ok: true });
-      const current = getJustInCaseState(token);
-      if (current) send("state", current);
+      void getJustInCaseSnapshot(token).then((snapshot) => {
+        send("ready", { ok: true });
+        if (snapshot.state) {
+          send("state", {
+            state: snapshot.state,
+            updatedAt: snapshot.updatedAt,
+          });
+        }
+      });
 
       cleanup = subscribeJustInCase(token, (payload) => {
         send("state", payload);

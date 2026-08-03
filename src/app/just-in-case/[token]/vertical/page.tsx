@@ -19,7 +19,7 @@ export default async function PublicJustInCaseVerticalPage({
 }: Props) {
   const { token } = await params;
   const { overlay } = await searchParams;
-  ensurePublicJustInCaseRoom(token);
+  await ensurePublicJustInCaseRoom(token);
   const isOverlay = overlay === "cases" || overlay === "player" || overlay === "offer";
 
   return (

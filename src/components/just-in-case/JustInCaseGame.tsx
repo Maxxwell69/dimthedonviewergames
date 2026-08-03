@@ -114,6 +114,8 @@ export function JustInCaseGame({
   const [copyNote, setCopyNote] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
   const applyingRemote = useRef(false);
+  const lastAppliedUpdatedAt = useRef<string | null>(null);
+  const lastPublishedJson = useRef<string | null>(null);
 
   const remaining = useMemo(
     () => cases.filter((c) => !opened.includes(c.id)).map((c) => c.value),
@@ -142,8 +144,9 @@ export function JustInCaseGame({
     window.history.replaceState({}, "", url);
   }
 
-  function applyShared(data: SharedGame) {
+  function applyShared(data: SharedGame, updatedAt?: string | null) {
     applyingRemote.current = true;
+    if (updatedAt) lastAppliedUpdatedAt.current = updatedAt;
     setMax(data.max);
     setDraft(data.draft);
     setValues(data.values);
@@ -156,13 +159,18 @@ export function JustInCaseGame({
     setOffer(data.offer);
     setResult(data.result);
     setRevealing(data.revealing);
+    lastPublishedJson.current = JSON.stringify(data);
     queueMicrotask(() => {
       applyingRemote.current = false;
     });
   }
 
   useEffect(() => {
-    if (isViewer) return;
+    // Controllers keep a local backup; OBS/viewers only follow the server room.
+    if (isViewer) {
+      setSyncReady(true);
+      return;
+    }
     const stored = localStorage.getItem(SYNC_KEY);
     if (stored) {
       try {
@@ -171,22 +179,12 @@ export function JustInCaseGame({
         localStorage.removeItem(SYNC_KEY);
       }
     }
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === SYNC_KEY && event.newValue) {
-        try {
-          applyShared(JSON.parse(event.newValue) as SharedGame);
-        } catch {
-          /* ignore bad sync payloads */
-        }
-      }
-    };
-    window.addEventListener("storage", onStorage);
     setSyncReady(true);
-    return () => window.removeEventListener("storage", onStorage);
   }, [isViewer]);
 
+  // Publish local controller changes into the shared DB room.
   useEffect(() => {
-    if (isViewer || !syncReady || !syncToken) return;
+    if (isViewer || !syncReady || !syncToken || applyingRemote.current) return;
     const shared: SharedGame = {
       max,
       draft,
@@ -203,19 +201,23 @@ export function JustInCaseGame({
     };
     const json = JSON.stringify(shared);
     if (localStorage.getItem(SYNC_KEY) !== json) localStorage.setItem(SYNC_KEY, json);
+    if (lastPublishedJson.current === json) return;
 
-    if (applyingRemote.current) return;
-    const endpoint = isHost
-      ? "/api/just-in-case/state"
-      : `/api/just-in-case/${syncToken}/state`;
+    const endpoint = `/api/just-in-case/${syncToken}/state`;
     void fetch(endpoint, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: json,
-    }).catch(() => {});
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = (await res.json().catch(() => ({}))) as { updatedAt?: string };
+        lastPublishedJson.current = json;
+        if (data.updatedAt) lastAppliedUpdatedAt.current = data.updatedAt;
+      })
+      .catch(() => {});
   }, [
     isViewer,
-    isHost,
     syncReady,
     syncToken,
     max,
@@ -236,11 +238,25 @@ export function JustInCaseGame({
     let cancelled = false;
 
     async function boot() {
-      if (isViewer && publicToken) {
+      if (publicToken) {
         setSyncToken(publicToken);
+        localStorage.setItem(ROOM_KEY, publicToken);
         const res = await fetch(`/api/just-in-case/${publicToken}`, { cache: "no-store" });
-        const data = (await res.json().catch(() => ({}))) as { state?: SharedGame | null };
-        if (!cancelled && data.state) applyShared(data.state);
+        const data = (await res.json().catch(() => ({}))) as {
+          state?: SharedGame | null;
+          updatedAt?: string | null;
+          overlays?: never;
+        };
+        if (!cancelled && data.state) applyShared(data.state, data.updatedAt);
+        // Still load overlay path helpers for controllers.
+        if (!isViewer) {
+          setOverlayPaths({
+            cases: `/just-in-case/${publicToken}/${layoutKey}?overlay=cases`,
+            player: `/just-in-case/${publicToken}/${layoutKey}?overlay=player`,
+            offer: `/just-in-case/${publicToken}/${layoutKey}?overlay=offer`,
+            full: `/just-in-case/${publicToken}/${layoutKey}`,
+          });
+        }
         return;
       }
 
@@ -251,9 +267,9 @@ export function JustInCaseGame({
           overlays?: { widescreen: OverlayPaths; vertical: OverlayPaths };
         };
         if (cancelled || !data.token || !data.overlays) return;
+        localStorage.setItem(ROOM_KEY, data.token);
         setSyncToken(data.token);
         setOverlayPaths(data.overlays[layoutKey]);
-        // Keep the address bar on a public URL so copied links work in TikTok/OBS.
         const next = new URL(window.location.href);
         next.pathname = `/just-in-case/${data.token}/${layoutKey}`;
         window.history.replaceState({}, "", next);
@@ -262,7 +278,6 @@ export function JustInCaseGame({
 
       // Public open game: reuse local room or create one (no login).
       const existing =
-        publicToken ||
         new URLSearchParams(window.location.search).get("room") ||
         localStorage.getItem(ROOM_KEY);
       const res = await fetch("/api/just-in-case/room", {
@@ -291,18 +306,42 @@ export function JustInCaseGame({
     };
   }, [isHost, isViewer, publicToken, layoutKey]);
 
+  // Poll shared DB state so OBS/TikTok always follow the same room.
   useEffect(() => {
-    if (!isViewer || !syncToken) return;
-    const source = new EventSource(`/api/just-in-case/${syncToken}/stream`);
-    source.addEventListener("state", (event) => {
+    if (!syncToken) return;
+    let cancelled = false;
+
+    async function pull() {
       try {
-        applyShared(JSON.parse((event as MessageEvent).data) as SharedGame);
+        const res = await fetch(`/api/just-in-case/${syncToken}?t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          state?: SharedGame | null;
+          updatedAt?: string | null;
+        };
+        if (!data.state || !data.updatedAt) return;
+        if (data.updatedAt === lastAppliedUpdatedAt.current) return;
+        // Controllers ignore echoes of their own publishes.
+        const remoteJson = JSON.stringify(data.state);
+        if (!isViewer && remoteJson === lastPublishedJson.current) {
+          lastAppliedUpdatedAt.current = data.updatedAt;
+          return;
+        }
+        applyShared(data.state, data.updatedAt);
       } catch {
-        /* ignore bad stream payloads */
+        /* ignore transient poll errors */
       }
-    });
-    return () => source.close();
-  }, [isViewer, syncToken]);
+    }
+
+    void pull();
+    const id = window.setInterval(() => void pull(), 700);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [syncToken, isViewer]);
 
   async function copyOverlay(path: string, label: string) {
     const url = `${window.location.origin}${path}`;
@@ -733,8 +772,8 @@ export function JustInCaseGame({
               <div className="overlay-admin">
                 <h3>TIKTOK / OBS PUBLIC URLS</h3>
                 <p>
-                  Use these only — they never ask for login. Do not paste a /dashboard or /login
-                  link into TikTok Live Studio.
+                  Use these only — they never ask for login. Copy them from THIS game session so OBS
+                  uses the same room token as your browser. Do not paste /dashboard or /login links.
                 </p>
                 {overlayPaths ? (
                   <>

@@ -79,3 +79,10 @@ model Winner {
 
   @@index([wheelId])
 }
+
+model JustInCaseRoom {
+  token     String   @id
+  stateJson String   @db.Text
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}

@@ -19,9 +19,10 @@ export default async function PublicJustInCaseWidescreenPage({
 }: Props) {
   const { token } = await params;
   const { overlay } = await searchParams;
-  ensurePublicJustInCaseRoom(token);
+  await ensurePublicJustInCaseRoom(token);
   const isOverlay = overlay === "cases" || overlay === "player" || overlay === "offer";
 
+  // Overlay views are follow-only. Full game URL can control AND follow the room.
   return (
     <JustInCaseLandscape
       mode={isOverlay ? "viewer" : "open"}

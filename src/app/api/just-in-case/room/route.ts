@@ -19,7 +19,7 @@ export async function POST(req: Request) {
         overlays: buildJustInCaseOverlayPaths(requested),
       });
     }
-    const token = ensurePublicJustInCaseRoom(requested);
+    const token = await ensurePublicJustInCaseRoom(requested);
     if (!token) {
       return NextResponse.json({ error: "Invalid token" }, { status: 400 });
     }
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const token = createPublicJustInCaseRoom();
+  const token = await createPublicJustInCaseRoom();
   return NextResponse.json({
     token,
     overlays: buildJustInCaseOverlayPaths(token),

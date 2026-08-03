@@ -24,22 +24,33 @@ export type JustInCaseSharedGame = {
   revealing: number | null;
 };
 
-const states = new Map<string, JustInCaseSharedGame>();
-const publicRooms = new Set<string>();
+export type JustInCaseRoomSnapshot = {
+  token: string;
+  state: JustInCaseSharedGame | null;
+  updatedAt: string | null;
+};
 
 export function justInCaseChannel(token: string) {
   return `just-in-case:${token}`;
 }
 
-export function createPublicJustInCaseRoom() {
+export async function createPublicJustInCaseRoom() {
   const token = nanoid(24);
-  publicRooms.add(token);
+  await prisma.justInCaseRoom.upsert({
+    where: { token },
+    create: { token, stateJson: "" },
+    update: {},
+  });
   return token;
 }
 
-export function ensurePublicJustInCaseRoom(token: string) {
+export async function ensurePublicJustInCaseRoom(token: string) {
   if (!token || token.length < 8) return null;
-  publicRooms.add(token);
+  await prisma.justInCaseRoom.upsert({
+    where: { token },
+    create: { token, stateJson: "" },
+    update: {},
+  });
   return token;
 }
 
@@ -49,7 +60,7 @@ export async function getOrCreateJustInCaseToken(userId: string) {
     select: { justInCaseToken: true },
   });
   if (existing?.justInCaseToken) {
-    publicRooms.add(existing.justInCaseToken);
+    await ensurePublicJustInCaseRoom(existing.justInCaseToken);
     return existing.justInCaseToken;
   }
 
@@ -58,7 +69,7 @@ export async function getOrCreateJustInCaseToken(userId: string) {
     where: { id: userId },
     data: { justInCaseToken: token },
   });
-  publicRooms.add(token);
+  await ensurePublicJustInCaseRoom(token);
   return token;
 }
 
@@ -68,8 +79,9 @@ export async function rotateJustInCaseToken(userId: string) {
     select: { justInCaseToken: true },
   });
   if (previous?.justInCaseToken) {
-    states.delete(previous.justInCaseToken);
-    publicRooms.delete(previous.justInCaseToken);
+    await prisma.justInCaseRoom.deleteMany({
+      where: { token: previous.justInCaseToken },
+    });
   }
 
   const token = nanoid(24);
@@ -77,31 +89,65 @@ export async function rotateJustInCaseToken(userId: string) {
     where: { id: userId },
     data: { justInCaseToken: token },
   });
-  publicRooms.add(token);
+  await ensurePublicJustInCaseRoom(token);
   return token;
 }
 
 export async function justInCaseRoomExists(token: string) {
-  if (publicRooms.has(token)) return true;
+  const room = await prisma.justInCaseRoom.findUnique({
+    where: { token },
+    select: { token: true },
+  });
+  if (room) return true;
+
   const user = await prisma.user.findUnique({
     where: { justInCaseToken: token },
     select: { id: true },
   });
-  if (user) {
-    publicRooms.add(token);
-    return true;
+  if (!user) return false;
+  await ensurePublicJustInCaseRoom(token);
+  return true;
+}
+
+function parseState(stateJson: string): JustInCaseSharedGame | null {
+  if (!stateJson) return null;
+  try {
+    const parsed = JSON.parse(stateJson) as unknown;
+    return isValidJustInCaseState(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
-  return false;
 }
 
-export function getJustInCaseState(token: string) {
-  return states.get(token) ?? null;
+export async function getJustInCaseSnapshot(
+  token: string,
+): Promise<JustInCaseRoomSnapshot> {
+  const room = await prisma.justInCaseRoom.findUnique({ where: { token } });
+  if (!room) {
+    return { token, state: null, updatedAt: null };
+  }
+  return {
+    token,
+    state: parseState(room.stateJson),
+    updatedAt: room.updatedAt.toISOString(),
+  };
 }
 
-export function setJustInCaseState(token: string, state: JustInCaseSharedGame) {
-  publicRooms.add(token);
-  states.set(token, state);
-  publish(justInCaseChannel(token), state);
+export async function setJustInCaseState(
+  token: string,
+  state: JustInCaseSharedGame,
+) {
+  const stateJson = JSON.stringify(state);
+  const room = await prisma.justInCaseRoom.upsert({
+    where: { token },
+    create: { token, stateJson },
+    update: { stateJson },
+  });
+  publish(justInCaseChannel(token), {
+    state,
+    updatedAt: room.updatedAt.toISOString(),
+  });
+  return room.updatedAt.toISOString();
 }
 
 export function subscribeJustInCase(
