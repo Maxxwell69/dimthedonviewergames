@@ -98,7 +98,7 @@ export function JustInCaseGame({
   const [revealing, setRevealing] = useState<number | null>(null);
   const [result, setResult] = useState("");
   const [setup, setSetup] = useState(false);
-  const [musicOn, setMusicOn] = useState(!isViewerMode);
+  const [musicOn, setMusicOn] = useState(false);
   const [fxOn, setFxOn] = useState(!isViewerMode);
   const [music, setMusic] = useState<SoundFile>(null);
   const [offerSound, setOfferSound] = useState<SoundFile>(null);
@@ -607,9 +607,6 @@ export function JustInCaseGame({
               <Link className="admin-exit" href={otherLayoutHref}>
                 {otherLayoutLabel}
               </Link>
-              <button className={musicOn ? "on" : ""} onClick={() => setMusicOn((v) => !v)}>
-                ♫ MUSIC
-              </button>
               <button className={fxOn ? "on" : ""} onClick={() => setFxOn((v) => !v)}>
                 🔊 FX
               </button>
@@ -758,6 +755,14 @@ export function JustInCaseGame({
                 <strong>{chips(Math.max(100, draft || 100))}</strong>
               </div>
               <h3>CUSTOM SHOW AUDIO</h3>
+              <label className="music-toggle">
+                <input
+                  type="checkbox"
+                  checked={musicOn}
+                  onChange={(e) => setMusicOn(e.target.checked)}
+                />
+                Enable background music (off by default)
+              </label>
               <Upload label="Background Music" value={music} onFile={(f) => file("music", f)} />
               <Upload
                 label="Dom’s Offer Sound"

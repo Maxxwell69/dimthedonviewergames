@@ -44,6 +44,22 @@
   color: var(--gold);
   word-break: break-all;
 }
+.just-in-case-vertical .music-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+  color: #b49a67;
+  font: 800 9px Arial;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.just-in-case-vertical .music-toggle input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--gold);
+}
 
 
 

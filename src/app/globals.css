@@ -614,7 +614,8 @@ html.overlay-mode #__next,
 .size-preview {
   display: grid;
   place-items: center;
-  height: 110px;
+  height: 120px;
+  overflow: hidden;
   border: 1px solid var(--line);
   background:
     linear-gradient(160deg, rgba(60, 24, 24, 0.55), rgba(8, 6, 6, 0.9)),
@@ -623,19 +624,21 @@ html.overlay-mode #__next,
 
 .size-preview span {
   display: block;
+  flex-shrink: 0;
   border: 2px solid var(--gold);
   background: rgba(12, 8, 8, 0.85);
   box-shadow: 0 0 18px rgba(201, 162, 77, 0.2);
 }
 
+/* Fixed preview frames so the 16:9 box cannot blow out of the card */
 .size-preview.landscape span {
-  width: 72%;
-  aspect-ratio: 16 / 9;
+  width: 148px;
+  height: 83px;
 }
 
 .size-preview.portrait span {
-  height: 78%;
-  aspect-ratio: 9 / 16;
+  width: 48px;
+  height: 85px;
 }
 
 .overlay-path {
