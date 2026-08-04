@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   ensurePublicJustInCaseRoom,
-  getJustInCaseAssets,
+  getJustInCaseAssetsMeta,
   isValidJustInCaseZoneAssetsPayload,
   justInCaseRoomExists,
   setJustInCaseThemeAssets,
@@ -17,7 +17,8 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const snapshot = await getJustInCaseAssets(token);
+  // Meta only — full data URLs are served via /media/[theme]/[slot] for OBS/TikTok.
+  const snapshot = await getJustInCaseAssetsMeta(token);
   return NextResponse.json(snapshot, {
     headers: {
       "Cache-Control": "no-store, no-cache, must-revalidate",

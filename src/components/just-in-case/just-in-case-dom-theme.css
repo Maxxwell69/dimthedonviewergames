@@ -222,14 +222,22 @@
   border: 2px dashed #cfe4ff !important;
 }
 .theme-dom .player-stage .zone-bg {
+  object-fit: cover !important;
+  object-position: center center !important;
   background-size: cover !important;
   background-position: center center !important;
   background-color: #07101f;
 }
 .theme-dom .cases .zone-bg {
+  object-fit: cover !important;
+  object-position: center center !important;
   background-size: cover !important;
   background-position: center center !important;
   background-color: #07101f;
+}
+.theme-dom .portrait .portrait-bg {
+  object-fit: cover !important;
+  object-position: center center !important;
 }
 .theme-dom .zone-bg::after {
   background: linear-gradient(180deg, #03071318, #03071355);

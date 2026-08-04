@@ -97,29 +97,42 @@ function domsOffer(values: number[], round: number) {
   return Math.max(1, Math.round((avg * leverage * patience) / 10) * 10);
 }
 
-/** Compress owner uploads so OBS/TikTok room sync stays under payload limits. */
-function fileToZoneDataUrl(file: File, maxEdge = 1600): Promise<string> {
+/** JPEG for OBS/TikTok Studio compatibility (webp data URLs often fail there). */
+function canvasToJpegDataUrl(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  quality = 0.72,
+) {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, width);
+  canvas.height = Math.max(1, height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas unavailable");
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+function compressImageElement(img: HTMLImageElement, maxEdge = 1280): string {
+  const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+  return canvasToJpegDataUrl(
+    img,
+    Math.round(img.width * scale),
+    Math.round(img.height * scale),
+  );
+}
+
+function fileToZoneDataUrl(file: File, maxEdge = 1280): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Could not read image"));
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
-        canvas.width = Math.max(1, Math.round(img.width * scale));
-        canvas.height = Math.max(1, Math.round(img.height * scale));
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          reject(new Error("Canvas unavailable"));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const mime = file.type === "image/jpeg" ? "image/jpeg" : "image/webp";
         try {
-          resolve(canvas.toDataURL(mime, 0.82));
-        } catch {
-          resolve(canvas.toDataURL("image/png"));
+          resolve(compressImageElement(img, maxEdge));
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error("Image compress failed"));
         }
       };
       img.onerror = () => reject(new Error("Invalid image"));
@@ -127,6 +140,47 @@ function fileToZoneDataUrl(file: File, maxEdge = 1600): Promise<string> {
     };
     reader.readAsDataURL(file);
   });
+}
+
+function recompressDataUrl(url: string, maxEdge = 1280): Promise<string> {
+  if (!url.startsWith("data:")) return Promise.resolve(url);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        resolve(compressImageElement(img, maxEdge));
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error("Image compress failed"));
+      }
+    };
+    img.onerror = () => reject(new Error("Invalid image"));
+    img.src = url;
+  });
+}
+
+async function normalizeZoneForPublish(zone: {
+  player: ImageFile;
+  dom: ImageFile;
+  stage: ImageFile;
+}) {
+  const entries = await Promise.all(
+    (["player", "dom", "stage"] as const).map(async (key) => {
+      const asset = zone[key];
+      if (!asset?.url) return [key, asset] as const;
+      if (!asset.url.startsWith("data:")) return [key, asset] as const;
+      const url = await recompressDataUrl(asset.url);
+      return [key, { ...asset, url }] as const;
+    }),
+  );
+  return {
+    player: entries.find(([k]) => k === "player")?.[1] ?? null,
+    dom: entries.find(([k]) => k === "dom")?.[1] ?? null,
+    stage: entries.find(([k]) => k === "stage")?.[1] ?? null,
+  } satisfies {
+    player: ImageFile;
+    dom: ImageFile;
+    stage: ImageFile;
+  };
 }
 
 type JustInCaseGameProps = {
@@ -219,7 +273,18 @@ export function JustInCaseGame({
   const lastAppliedAssetsAt = useRef<string | null>(null);
   const lastPublishedAssetsJson = useRef<string | null>(null);
   const zoneAssetsDirty = useRef(false);
+  /** Canonical upload payload (data URLs / public paths) — never media API URLs. */
+  const sourceZoneRef = useRef<{
+    player: ImageFile;
+    dom: ImageFile;
+    stage: ImageFile;
+  }>({
+    player: isDomTheme ? DOM_ZONE_DEFAULTS.player : null,
+    dom: isDomTheme ? DOM_ZONE_DEFAULTS.dom : null,
+    stage: isDomTheme ? DOM_ZONE_DEFAULTS.stage : null,
+  });
   const [zoneBgsReady, setZoneBgsReady] = useState(false);
+  const [assetsSyncNote, setAssetsSyncNote] = useState<string | null>(null);
 
   const remaining = useMemo(
     () => cases.filter((c) => !opened.includes(c.id)).map((c) => c.value),
@@ -234,26 +299,47 @@ export function JustInCaseGame({
   const isViewer = isViewerMode || isOverlayView;
   const canInteract = !isViewer;
 
-  function applyZoneBgs(saved: {
-    player?: ImageFile;
-    dom?: ImageFile;
-    stage?: ImageFile;
-  } | null) {
-    if (!saved) {
-      if (isDomTheme) {
-        setPlayerBg(DOM_ZONE_DEFAULTS.player);
-        setDomBg(DOM_ZONE_DEFAULTS.dom);
-        setStageBg(DOM_ZONE_DEFAULTS.stage);
-      } else {
-        setPlayerBg(null);
-        setDomBg(null);
-        setStageBg(null);
+  function applyZoneBgs(
+    saved: {
+      player?: ImageFile;
+      dom?: ImageFile;
+      stage?: ImageFile;
+    } | null,
+    opts?: { asSource?: boolean },
+  ) {
+    const next = !saved
+      ? {
+          player: isDomTheme ? DOM_ZONE_DEFAULTS.player : null,
+          dom: isDomTheme ? DOM_ZONE_DEFAULTS.dom : null,
+          stage: isDomTheme ? DOM_ZONE_DEFAULTS.stage : null,
+        }
+      : {
+          player: saved.player?.url
+            ? saved.player
+            : isDomTheme
+              ? DOM_ZONE_DEFAULTS.player
+              : null,
+          dom: saved.dom?.url ? saved.dom : isDomTheme ? DOM_ZONE_DEFAULTS.dom : null,
+          stage: saved.stage?.url
+            ? saved.stage
+            : isDomTheme
+              ? DOM_ZONE_DEFAULTS.stage
+              : null,
+        };
+    if (opts?.asSource !== false) {
+      const isMediaUrl = (url?: string) =>
+        Boolean(url && url.includes("/api/just-in-case/") && url.includes("/media/"));
+      if (
+        !isMediaUrl(next.player?.url) &&
+        !isMediaUrl(next.dom?.url) &&
+        !isMediaUrl(next.stage?.url)
+      ) {
+        sourceZoneRef.current = next;
       }
-      return;
     }
-    setPlayerBg(saved.player?.url ? saved.player : isDomTheme ? DOM_ZONE_DEFAULTS.player : null);
-    setDomBg(saved.dom?.url ? saved.dom : isDomTheme ? DOM_ZONE_DEFAULTS.dom : null);
-    setStageBg(saved.stage?.url ? saved.stage : isDomTheme ? DOM_ZONE_DEFAULTS.stage : null);
+    setPlayerBg(next.player);
+    setDomBg(next.dom);
+    setStageBg(next.stage);
   }
 
   useEffect(() => {
@@ -486,35 +572,51 @@ export function JustInCaseGame({
 
     async function pullAssets(assetsUpdatedAt: string) {
       try {
+        // Don't clobber in-progress owner edits before their first publish lands.
+        if (zoneAssetsDirty.current && lastPublishedAssetsJson.current === null) {
+          return;
+        }
         const res = await fetch(
           `/api/just-in-case/${syncToken}/assets?t=${Date.now()}`,
           { cache: "no-store" },
         );
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as {
-          assets?: {
-            dom?: { player: ImageFile; dom: ImageFile; stage: ImageFile };
-            vault?: { player: ImageFile; dom: ImageFile; stage: ImageFile };
-          } | null;
           assetsUpdatedAt?: string | null;
+          present?: {
+            dom?: { player: boolean; dom: boolean; stage: boolean };
+            vault?: { player: boolean; dom: boolean; stage: boolean };
+          };
         };
-        const themeAssets = isVaultTheme ? data.assets?.vault : data.assets?.dom;
-        if (!themeAssets) {
+        const themeKey = isVaultTheme ? "vault" : "dom";
+        const present = data.present?.[themeKey];
+        if (!present) {
           lastAppliedAssetsAt.current = assetsUpdatedAt;
           return;
         }
+
+        // OBS/TikTok load normal image URLs — not giant data: URLs in CSS.
+        const rev = encodeURIComponent(data.assetsUpdatedAt ?? assetsUpdatedAt);
+        const media = (slot: ZoneBgKind, fallback: ImageFile): ImageFile => {
+          if (!present[slot]) return fallback;
+          return {
+            name: `${themeKey}-${slot}`,
+            url: `/api/just-in-case/${syncToken}/media/${themeKey}/${slot}?v=${rev}`,
+          };
+        };
+        const themeAssets = {
+          player: media("player", isDomTheme ? DOM_ZONE_DEFAULTS.player : null),
+          dom: media("dom", isDomTheme ? DOM_ZONE_DEFAULTS.dom : null),
+          stage: media("stage", isDomTheme ? DOM_ZONE_DEFAULTS.stage : null),
+        };
         const remoteJson = JSON.stringify(themeAssets);
         if (remoteJson === lastPublishedAssetsJson.current) {
           lastAppliedAssetsAt.current = assetsUpdatedAt;
           zoneAssetsDirty.current = false;
           return;
         }
-        // Don't clobber in-progress owner edits before their first publish lands.
-        if (zoneAssetsDirty.current && lastPublishedAssetsJson.current === null) {
-          return;
-        }
-        applyZoneBgs(themeAssets);
-        if (!isViewerMode) persistZoneBgs(themeAssets);
+        // Display-only media URLs for OBS — do not overwrite owner source uploads.
+        applyZoneBgs(themeAssets, { asSource: false });
         lastPublishedAssetsJson.current = remoteJson;
         zoneAssetsDirty.current = false;
         lastAppliedAssetsAt.current = data.assetsUpdatedAt ?? assetsUpdatedAt;
@@ -560,41 +662,66 @@ export function JustInCaseGame({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [syncToken, isViewer, isVaultTheme]);
+  }, [syncToken, isViewer, isVaultTheme, isDomTheme, isViewerMode]);
 
   // Controllers publish zone backdrops into the shared room for OBS/TikTok.
   useEffect(() => {
     if (isViewer || !syncReady || !syncToken || !zoneBgsReady) return;
     if (!zoneAssetsDirty.current) return;
-    const zone = { player: playerBg, dom: domBg, stage: stageBg };
-    const json = JSON.stringify(zone);
-    if (lastPublishedAssetsJson.current === json) {
+    const zone = sourceZoneRef.current;
+    const sourceJson = JSON.stringify(zone);
+    if (lastPublishedAssetsJson.current === sourceJson) {
       zoneAssetsDirty.current = false;
       return;
     }
 
+    let cancelled = false;
     const handle = window.setTimeout(() => {
-      void fetch(`/api/just-in-case/${syncToken}/assets`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          theme: isVaultTheme ? "vault" : "dom",
-          zone,
-        }),
-      })
-        .then(async (res) => {
-          if (!res.ok) return;
+      void (async () => {
+        try {
+          const normalized = await normalizeZoneForPublish(zone);
+          if (cancelled) return;
+          const res = await fetch(`/api/just-in-case/${syncToken}/assets`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              theme: isVaultTheme ? "vault" : "dom",
+              zone: normalized,
+            }),
+          });
+          if (!res.ok) {
+            const err = (await res.json().catch(() => ({}))) as { error?: string };
+            setAssetsSyncNote(
+              err.error ||
+                "Backdrop sync failed — try a smaller JPG/PNG, then refresh OBS.",
+            );
+            return;
+          }
           const data = (await res.json().catch(() => ({}))) as {
             assetsUpdatedAt?: string;
           };
-          lastPublishedAssetsJson.current = json;
+          sourceZoneRef.current = normalized;
+          persistZoneBgs(normalized);
+          applyZoneBgs(normalized);
+          lastPublishedAssetsJson.current = JSON.stringify(normalized);
           zoneAssetsDirty.current = false;
           if (data.assetsUpdatedAt) lastAppliedAssetsAt.current = data.assetsUpdatedAt;
-        })
-        .catch(() => {});
+          setAssetsSyncNote("Backdrops synced to TikTok / OBS URLs");
+          window.setTimeout(() => setAssetsSyncNote(null), 2500);
+        } catch {
+          if (!cancelled) {
+            setAssetsSyncNote(
+              "Backdrop sync failed — re-upload a smaller image, then refresh OBS.",
+            );
+          }
+        }
+      })();
     }, 250);
 
-    return () => window.clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
   }, [
     isViewer,
     syncReady,
@@ -839,14 +966,16 @@ export function JustInCaseGame({
   }
 
   function setZoneBg(kind: ZoneBgKind, next: ImageFile) {
-    const player = kind === "player" ? next : playerBg;
-    const dom = kind === "dom" ? next : domBg;
-    const stage = kind === "stage" ? next : stageBg;
+    const player = kind === "player" ? next : sourceZoneRef.current.player;
+    const dom = kind === "dom" ? next : sourceZoneRef.current.dom;
+    const stage = kind === "stage" ? next : sourceZoneRef.current.stage;
+    const source = { player, dom, stage };
+    sourceZoneRef.current = source;
     if (kind === "player") setPlayerBg(next);
     else if (kind === "dom") setDomBg(next);
     else setStageBg(next);
     zoneAssetsDirty.current = true;
-    persistZoneBgs({ player, dom, stage });
+    persistZoneBgs(source);
   }
 
   function clearZoneBg(kind: ZoneBgKind) {
@@ -931,11 +1060,8 @@ export function JustInCaseGame({
             <div className="club-seal">{labels.seal}</div>
             <div className={`player-stage ${playerBg ? "has-zone-bg" : ""}`}>
               {playerBg ? (
-                <div
-                  className="zone-bg"
-                  style={{ backgroundImage: `url(${playerBg.url})` }}
-                  aria-hidden
-                />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="zone-bg" src={playerBg.url} alt="" aria-hidden />
               ) : null}
               {mine ? (
                 <Briefcase
@@ -968,11 +1094,8 @@ export function JustInCaseGame({
             <div className="instruction">◆ {status} ◆</div>
             <div className={`cases ${stageBg ? "has-zone-bg" : ""}`}>
               {stageBg ? (
-                <div
-                  className="zone-bg"
-                  style={{ backgroundImage: `url(${stageBg.url})` }}
-                  aria-hidden
-                />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="zone-bg" src={stageBg.url} alt="" aria-hidden />
               ) : null}
               {cases.map((c) => (
                 <Briefcase
@@ -1006,15 +1129,13 @@ export function JustInCaseGame({
             <h2>{labels.banker}</h2>
             <div
               className={`portrait ${domBg ? "has-custom-bg" : "camera-slot"}`}
-              style={
-                domBg
-                  ? {
-                      backgroundImage: `url(${domBg.url})`,
-                    }
-                  : undefined
-              }
               aria-label={domBg ? `${labels.banker} backdrop` : "Blank camera overlay area"}
-            />
+            >
+              {domBg ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="zone-bg portrait-bg" src={domBg.url} alt="" aria-hidden />
+              ) : null}
+            </div>
             <div className="offer-label">{labels.offer}</div>
             <div className={`offer ${phase === "offer" ? "active" : ""}`}>
               {offer ? chips(phase === "offer" ? offerDisplay : offer) : "—"}
@@ -1081,6 +1202,7 @@ export function JustInCaseGame({
                   ? "Dom neon stage ships with default backdrops. Swap images for Your Case, Dom’s box, and the briefcases stage — they sync to your TikTok / OBS public URLs."
                   : "Optional images behind Your Case, the Banker box, and the briefcases stage. Changes sync to your TikTok / OBS public URLs for this room."}
               </p>
+              {assetsSyncNote ? <p className="overlay-url-hint">{assetsSyncNote}</p> : null}
               <Upload
                 label="Your Case Background"
                 value={playerBg}

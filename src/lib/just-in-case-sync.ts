@@ -202,6 +202,28 @@ export async function getJustInCaseSnapshot(
   };
 }
 
+export type JustInCaseZonePresence = {
+  player: boolean;
+  dom: boolean;
+  stage: boolean;
+};
+
+export type JustInCaseAssetsMeta = {
+  assetsUpdatedAt: string | null;
+  present: {
+    dom?: JustInCaseZonePresence;
+    vault?: JustInCaseZonePresence;
+  };
+};
+
+function zonePresence(zone?: JustInCaseZoneAssets): JustInCaseZonePresence {
+  return {
+    player: Boolean(zone?.player?.url),
+    dom: Boolean(zone?.dom?.url),
+    stage: Boolean(zone?.stage?.url),
+  };
+}
+
 export async function getJustInCaseAssets(token: string): Promise<{
   assets: JustInCaseRoomAssets | null;
   assetsUpdatedAt: string | null;
@@ -217,6 +239,51 @@ export async function getJustInCaseAssets(token: string): Promise<{
     assets: parseAssets(room.assetsJson),
     assetsUpdatedAt: room.assetsUpdatedAt?.toISOString() ?? null,
   };
+}
+
+/** Light payload for OBS polling — no multi‑MB data URLs. */
+export async function getJustInCaseAssetsMeta(
+  token: string,
+): Promise<JustInCaseAssetsMeta> {
+  const snapshot = await getJustInCaseAssets(token);
+  const assets = snapshot.assets;
+  return {
+    assetsUpdatedAt: snapshot.assetsUpdatedAt,
+    present: {
+      ...(assets?.dom ? { dom: zonePresence(assets.dom) } : {}),
+      ...(assets?.vault ? { vault: zonePresence(assets.vault) } : {}),
+    },
+  };
+}
+
+export async function getJustInCaseZoneImage(
+  token: string,
+  theme: "dom" | "vault",
+  slot: "player" | "dom" | "stage",
+): Promise<
+  | { kind: "bytes"; contentType: string; body: Buffer }
+  | { kind: "redirect"; location: string }
+  | null
+> {
+  const snapshot = await getJustInCaseAssets(token);
+  const zone = theme === "vault" ? snapshot.assets?.vault : snapshot.assets?.dom;
+  const asset = zone?.[slot];
+  if (!asset?.url) return null;
+
+  const url = asset.url;
+  if (url.startsWith("data:")) {
+    const match = /^data:([^;,]+);base64,(.+)$/s.exec(url);
+    if (!match) return null;
+    return {
+      kind: "bytes",
+      contentType: match[1] || "image/jpeg",
+      body: Buffer.from(match[2], "base64"),
+    };
+  }
+  if (url.startsWith("/") || url.startsWith("http://") || url.startsWith("https://")) {
+    return { kind: "redirect", location: url };
+  }
+  return null;
 }
 
 export async function setJustInCaseThemeAssets(
@@ -247,10 +314,19 @@ export async function setJustInCaseThemeAssets(
   publish(justInCaseChannel(token), {
     type: "assets",
     theme,
-    assets: next,
     assetsUpdatedAt,
+    present: {
+      dom: next.dom ? zonePresence(next.dom) : undefined,
+      vault: next.vault ? zonePresence(next.vault) : undefined,
+    },
   });
-  return { assets: next, assetsUpdatedAt };
+  return {
+    assetsUpdatedAt,
+    present: {
+      ...(next.dom ? { dom: zonePresence(next.dom) } : {}),
+      ...(next.vault ? { vault: zonePresence(next.vault) } : {}),
+    },
+  };
 }
 
 export async function setJustInCaseState(
