@@ -272,7 +272,7 @@ export async function getJustInCaseZoneImage(
 
   const url = asset.url;
   if (url.startsWith("data:")) {
-    const match = /^data:([^;,]+);base64,(.+)$/s.exec(url);
+    const match = /^data:([^;,]+);base64,([\s\S]+)$/.exec(url);
     if (!match) return null;
     return {
       kind: "bytes",
