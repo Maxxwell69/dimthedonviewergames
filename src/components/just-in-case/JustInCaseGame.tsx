@@ -97,6 +97,38 @@ function domsOffer(values: number[], round: number) {
   return Math.max(1, Math.round((avg * leverage * patience) / 10) * 10);
 }
 
+/** Compress owner uploads so OBS/TikTok room sync stays under payload limits. */
+function fileToZoneDataUrl(file: File, maxEdge = 1600): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read image"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas unavailable"));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const mime = file.type === "image/jpeg" ? "image/jpeg" : "image/webp";
+        try {
+          resolve(canvas.toDataURL(mime, 0.82));
+        } catch {
+          resolve(canvas.toDataURL("image/png"));
+        }
+      };
+      img.onerror = () => reject(new Error("Invalid image"));
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 type JustInCaseGameProps = {
   variant?: JustInCaseVariant;
   theme?: JustInCaseTheme;
@@ -184,6 +216,10 @@ export function JustInCaseGame({
   const applyingRemote = useRef(false);
   const lastAppliedUpdatedAt = useRef<string | null>(null);
   const lastPublishedJson = useRef<string | null>(null);
+  const lastAppliedAssetsAt = useRef<string | null>(null);
+  const lastPublishedAssetsJson = useRef<string | null>(null);
+  const zoneAssetsDirty = useRef(false);
+  const [zoneBgsReady, setZoneBgsReady] = useState(false);
 
   const remaining = useMemo(
     () => cases.filter((c) => !opened.includes(c.id)).map((c) => c.value),
@@ -198,36 +234,64 @@ export function JustInCaseGame({
   const isViewer = isViewerMode || isOverlayView;
   const canInteract = !isViewer;
 
+  function applyZoneBgs(saved: {
+    player?: ImageFile;
+    dom?: ImageFile;
+    stage?: ImageFile;
+  } | null) {
+    if (!saved) {
+      if (isDomTheme) {
+        setPlayerBg(DOM_ZONE_DEFAULTS.player);
+        setDomBg(DOM_ZONE_DEFAULTS.dom);
+        setStageBg(DOM_ZONE_DEFAULTS.stage);
+      } else {
+        setPlayerBg(null);
+        setDomBg(null);
+        setStageBg(null);
+      }
+      return;
+    }
+    setPlayerBg(saved.player?.url ? saved.player : isDomTheme ? DOM_ZONE_DEFAULTS.player : null);
+    setDomBg(saved.dom?.url ? saved.dom : isDomTheme ? DOM_ZONE_DEFAULTS.dom : null);
+    setStageBg(saved.stage?.url ? saved.stage : isDomTheme ? DOM_ZONE_DEFAULTS.stage : null);
+  }
+
   useEffect(() => {
     setOrigin(window.location.origin);
     const view = new URLSearchParams(window.location.search).get("overlay");
     if (view === "cases" || view === "player" || view === "offer") setOverlay(view);
+
+    // Follow-only overlays never publish local defaults over the shared room.
+    if (isViewerMode) {
+      applyZoneBgs(isDomTheme ? DOM_ZONE_DEFAULTS : null);
+      zoneAssetsDirty.current = false;
+      setZoneBgsReady(true);
+      return;
+    }
+
     try {
       const raw = localStorage.getItem(zoneBgKey);
       if (!raw) {
-        if (isDomTheme) {
-          setPlayerBg(DOM_ZONE_DEFAULTS.player);
-          setDomBg(DOM_ZONE_DEFAULTS.dom);
-          setStageBg(DOM_ZONE_DEFAULTS.stage);
-        } else {
-          setPlayerBg(null);
-          setDomBg(null);
-          setStageBg(null);
-        }
-        return;
+        applyZoneBgs(isDomTheme ? DOM_ZONE_DEFAULTS : null);
+        // Empty browser (e.g. OBS full URL) must pull room assets, not overwrite them.
+        zoneAssetsDirty.current = false;
+      } else {
+        const saved = JSON.parse(raw) as {
+          player?: ImageFile;
+          dom?: ImageFile;
+          stage?: ImageFile;
+        };
+        applyZoneBgs(saved);
+        // Push owner-saved customs into the room so TikTok/OBS can see them.
+        zoneAssetsDirty.current = true;
       }
-      const saved = JSON.parse(raw) as {
-        player?: ImageFile;
-        dom?: ImageFile;
-        stage?: ImageFile;
-      };
-      setPlayerBg(saved.player?.url ? saved.player : isDomTheme ? DOM_ZONE_DEFAULTS.player : null);
-      setDomBg(saved.dom?.url ? saved.dom : isDomTheme ? DOM_ZONE_DEFAULTS.dom : null);
-      setStageBg(saved.stage?.url ? saved.stage : isDomTheme ? DOM_ZONE_DEFAULTS.stage : null);
     } catch {
       localStorage.removeItem(zoneBgKey);
+      applyZoneBgs(isDomTheme ? DOM_ZONE_DEFAULTS : null);
+      zoneAssetsDirty.current = false;
     }
-  }, [zoneBgKey, isDomTheme]);
+    setZoneBgsReady(true);
+  }, [zoneBgKey, isDomTheme, isViewerMode]);
 
   function persistZoneBgs(next: {
     player: ImageFile;
@@ -420,6 +484,45 @@ export function JustInCaseGame({
     if (!syncToken) return;
     let cancelled = false;
 
+    async function pullAssets(assetsUpdatedAt: string) {
+      try {
+        const res = await fetch(
+          `/api/just-in-case/${syncToken}/assets?t=${Date.now()}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          assets?: {
+            dom?: { player: ImageFile; dom: ImageFile; stage: ImageFile };
+            vault?: { player: ImageFile; dom: ImageFile; stage: ImageFile };
+          } | null;
+          assetsUpdatedAt?: string | null;
+        };
+        const themeAssets = isVaultTheme ? data.assets?.vault : data.assets?.dom;
+        if (!themeAssets) {
+          lastAppliedAssetsAt.current = assetsUpdatedAt;
+          return;
+        }
+        const remoteJson = JSON.stringify(themeAssets);
+        if (remoteJson === lastPublishedAssetsJson.current) {
+          lastAppliedAssetsAt.current = assetsUpdatedAt;
+          zoneAssetsDirty.current = false;
+          return;
+        }
+        // Don't clobber in-progress owner edits before their first publish lands.
+        if (zoneAssetsDirty.current && lastPublishedAssetsJson.current === null) {
+          return;
+        }
+        applyZoneBgs(themeAssets);
+        if (!isViewerMode) persistZoneBgs(themeAssets);
+        lastPublishedAssetsJson.current = remoteJson;
+        zoneAssetsDirty.current = false;
+        lastAppliedAssetsAt.current = data.assetsUpdatedAt ?? assetsUpdatedAt;
+      } catch {
+        /* ignore transient asset fetch errors */
+      }
+    }
+
     async function pull() {
       try {
         const res = await fetch(`/api/just-in-case/${syncToken}?t=${Date.now()}`, {
@@ -429,7 +532,14 @@ export function JustInCaseGame({
         const data = (await res.json()) as {
           state?: SharedGame | null;
           updatedAt?: string | null;
+          assetsUpdatedAt?: string | null;
         };
+        if (
+          data.assetsUpdatedAt &&
+          data.assetsUpdatedAt !== lastAppliedAssetsAt.current
+        ) {
+          void pullAssets(data.assetsUpdatedAt);
+        }
         if (!data.state || !data.updatedAt) return;
         if (data.updatedAt === lastAppliedUpdatedAt.current) return;
         // Controllers ignore echoes of their own publishes.
@@ -450,7 +560,51 @@ export function JustInCaseGame({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [syncToken, isViewer]);
+  }, [syncToken, isViewer, isVaultTheme]);
+
+  // Controllers publish zone backdrops into the shared room for OBS/TikTok.
+  useEffect(() => {
+    if (isViewer || !syncReady || !syncToken || !zoneBgsReady) return;
+    if (!zoneAssetsDirty.current) return;
+    const zone = { player: playerBg, dom: domBg, stage: stageBg };
+    const json = JSON.stringify(zone);
+    if (lastPublishedAssetsJson.current === json) {
+      zoneAssetsDirty.current = false;
+      return;
+    }
+
+    const handle = window.setTimeout(() => {
+      void fetch(`/api/just-in-case/${syncToken}/assets`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          theme: isVaultTheme ? "vault" : "dom",
+          zone,
+        }),
+      })
+        .then(async (res) => {
+          if (!res.ok) return;
+          const data = (await res.json().catch(() => ({}))) as {
+            assetsUpdatedAt?: string;
+          };
+          lastPublishedAssetsJson.current = json;
+          zoneAssetsDirty.current = false;
+          if (data.assetsUpdatedAt) lastAppliedAssetsAt.current = data.assetsUpdatedAt;
+        })
+        .catch(() => {});
+    }, 250);
+
+    return () => window.clearTimeout(handle);
+  }, [
+    isViewer,
+    syncReady,
+    syncToken,
+    zoneBgsReady,
+    playerBg,
+    domBg,
+    stageBg,
+    isVaultTheme,
+  ]);
 
   async function copyOverlay(path: string, label: string) {
     const url = `${window.location.origin}${path}`;
@@ -691,6 +845,7 @@ export function JustInCaseGame({
     if (kind === "player") setPlayerBg(next);
     else if (kind === "dom") setDomBg(next);
     else setStageBg(next);
+    zoneAssetsDirty.current = true;
     persistZoneBgs({ player, dom, stage });
   }
 
@@ -700,13 +855,14 @@ export function JustInCaseGame({
 
   function imageFile(kind: ZoneBgKind, f?: File) {
     if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const url = String(reader.result || "");
-      if (!url) return;
-      setZoneBg(kind, { name: f.name, url });
-    };
-    reader.readAsDataURL(f);
+    void fileToZoneDataUrl(f)
+      .then((url) => {
+        if (!url) return;
+        setZoneBg(kind, { name: f.name, url });
+      })
+      .catch(() => {
+        /* keep previous backdrop on bad files */
+      });
   }
 
   const status =
@@ -922,8 +1078,8 @@ export function JustInCaseGame({
               <h3>ZONE BACKDROPS</h3>
               <p className="overlay-url-hint">
                 {isDomTheme
-                  ? "Dom neon stage ships with default backdrops. Swap images for Your Case, Dom’s box, and the briefcases stage anytime."
-                  : "Optional images behind Your Case, the Banker box, and the briefcases stage. Saved in this browser for OBS on the same machine."}
+                  ? "Dom neon stage ships with default backdrops. Swap images for Your Case, Dom’s box, and the briefcases stage — they sync to your TikTok / OBS public URLs."
+                  : "Optional images behind Your Case, the Banker box, and the briefcases stage. Changes sync to your TikTok / OBS public URLs for this room."}
               </p>
               <Upload
                 label="Your Case Background"

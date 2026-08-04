@@ -24,10 +24,27 @@ export type JustInCaseSharedGame = {
   revealing: number | null;
 };
 
+export type JustInCaseImageAsset = {
+  name: string;
+  url: string;
+} | null;
+
+export type JustInCaseZoneAssets = {
+  player: JustInCaseImageAsset;
+  dom: JustInCaseImageAsset;
+  stage: JustInCaseImageAsset;
+};
+
+export type JustInCaseRoomAssets = {
+  dom?: JustInCaseZoneAssets;
+  vault?: JustInCaseZoneAssets;
+};
+
 export type JustInCaseRoomSnapshot = {
   token: string;
   state: JustInCaseSharedGame | null;
   updatedAt: string | null;
+  assetsUpdatedAt: string | null;
 };
 
 export function justInCaseChannel(token: string) {
@@ -119,18 +136,121 @@ function parseState(stateJson: string): JustInCaseSharedGame | null {
   }
 }
 
+function isImageAsset(value: unknown): value is JustInCaseImageAsset {
+  if (value === null) return true;
+  if (!value || typeof value !== "object") return false;
+  const data = value as Record<string, unknown>;
+  return typeof data.name === "string" && typeof data.url === "string" && data.url.length > 0;
+}
+
+function isZoneAssets(value: unknown): value is JustInCaseZoneAssets {
+  if (!value || typeof value !== "object") return false;
+  const data = value as Record<string, unknown>;
+  return (
+    isImageAsset(data.player) &&
+    isImageAsset(data.dom) &&
+    isImageAsset(data.stage)
+  );
+}
+
+export function isValidJustInCaseAssets(
+  value: unknown,
+): value is JustInCaseRoomAssets {
+  if (!value || typeof value !== "object") return false;
+  const data = value as Record<string, unknown>;
+  if (data.dom !== undefined && !isZoneAssets(data.dom)) return false;
+  if (data.vault !== undefined && !isZoneAssets(data.vault)) return false;
+  return data.dom !== undefined || data.vault !== undefined;
+}
+
+function parseAssets(assetsJson: string): JustInCaseRoomAssets | null {
+  if (!assetsJson) return null;
+  try {
+    const parsed = JSON.parse(assetsJson) as unknown;
+    return isValidJustInCaseAssets(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Cap data-URL payloads so room sync stays reliable for OBS. */
+const MAX_ASSET_URL_CHARS = 2_500_000;
+
+export function isValidJustInCaseZoneAssetsPayload(
+  value: unknown,
+): value is JustInCaseZoneAssets {
+  if (!isZoneAssets(value)) return false;
+  for (const key of ["player", "dom", "stage"] as const) {
+    const asset = value[key];
+    if (asset && asset.url.length > MAX_ASSET_URL_CHARS) return false;
+  }
+  return true;
+}
+
 export async function getJustInCaseSnapshot(
   token: string,
 ): Promise<JustInCaseRoomSnapshot> {
   const room = await prisma.justInCaseRoom.findUnique({ where: { token } });
   if (!room) {
-    return { token, state: null, updatedAt: null };
+    return { token, state: null, updatedAt: null, assetsUpdatedAt: null };
   }
   return {
     token,
     state: parseState(room.stateJson),
     updatedAt: room.updatedAt.toISOString(),
+    assetsUpdatedAt: room.assetsUpdatedAt?.toISOString() ?? null,
   };
+}
+
+export async function getJustInCaseAssets(token: string): Promise<{
+  assets: JustInCaseRoomAssets | null;
+  assetsUpdatedAt: string | null;
+}> {
+  const room = await prisma.justInCaseRoom.findUnique({
+    where: { token },
+    select: { assetsJson: true, assetsUpdatedAt: true },
+  });
+  if (!room) {
+    return { assets: null, assetsUpdatedAt: null };
+  }
+  return {
+    assets: parseAssets(room.assetsJson),
+    assetsUpdatedAt: room.assetsUpdatedAt?.toISOString() ?? null,
+  };
+}
+
+export async function setJustInCaseThemeAssets(
+  token: string,
+  theme: "dom" | "vault",
+  zone: JustInCaseZoneAssets,
+) {
+  const existing = await getJustInCaseAssets(token);
+  const next: JustInCaseRoomAssets = {
+    ...(existing.assets ?? {}),
+    [theme]: zone,
+  };
+  const assetsJson = JSON.stringify(next);
+  const room = await prisma.justInCaseRoom.upsert({
+    where: { token },
+    create: {
+      token,
+      stateJson: "",
+      assetsJson,
+      assetsUpdatedAt: new Date(),
+    },
+    update: {
+      assetsJson,
+      assetsUpdatedAt: new Date(),
+    },
+  });
+  const assetsUpdatedAt = room.assetsUpdatedAt?.toISOString() ?? new Date().toISOString();
+  publish(justInCaseChannel(token), {
+    type: "assets",
+    theme,
+    assets: next,
+    assetsUpdatedAt,
+  });
+  return { assets: next, assetsUpdatedAt };
 }
 
 export async function setJustInCaseState(
