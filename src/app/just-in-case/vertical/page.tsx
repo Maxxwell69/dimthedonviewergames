@@ -8,5 +8,5 @@ export const metadata = {
 };
 
 export default function PublicVerticalGamePage() {
-  return <JustInCasePortrait mode="open" />;
+  return <JustInCasePortrait mode="open" theme="dom" />;
 }

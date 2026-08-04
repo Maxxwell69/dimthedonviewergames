@@ -25,6 +25,7 @@ export default async function PublicJustInCaseVerticalPage({
   return (
     <JustInCasePortrait
       mode={isOverlay ? "viewer" : "open"}
+      theme="dom"
       publicToken={token}
     />
   );

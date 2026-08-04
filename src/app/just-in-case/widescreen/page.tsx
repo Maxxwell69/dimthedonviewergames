@@ -8,5 +8,5 @@ export const metadata = {
 };
 
 export default function PublicWidescreenGamePage() {
-  return <JustInCaseLandscape mode="open" />;
+  return <JustInCaseLandscape mode="open" theme="dom" />;
 }

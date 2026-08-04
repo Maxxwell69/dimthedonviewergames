@@ -32,6 +32,7 @@ type SharedGame = {
 export type JustInCaseVariant = "landscape" | "portrait";
 /** host = dashboard operator; open = public playable; viewer = public overlay follow */
 export type JustInCaseMode = "host" | "open" | "viewer";
+export type JustInCaseTheme = "vault" | "dom";
 
 const ROOM_KEY = "dom-the-don-public-room-v1";
 
@@ -40,6 +41,15 @@ type OverlayPaths = {
   player: string;
   offer: string;
   full: string;
+};
+
+type OverlayPacks = {
+  widescreen: OverlayPaths;
+  vertical: OverlayPaths;
+  vault: {
+    widescreen: OverlayPaths;
+    vertical: OverlayPaths;
+  };
 };
 
 const chips = (n: number) => `◆ ${Math.round(n).toLocaleString()}`;
@@ -70,19 +80,49 @@ function domsOffer(values: number[], round: number) {
 
 type JustInCaseGameProps = {
   variant?: JustInCaseVariant;
+  theme?: JustInCaseTheme;
   mode?: JustInCaseMode;
   publicToken?: string;
 };
 
 export function JustInCaseGame({
   variant = "landscape",
+  theme = "dom",
   mode = "host",
   publicToken,
 }: JustInCaseGameProps) {
-  const rootClass = variant === "portrait" ? "just-in-case-vertical" : "just-in-case";
+  const isVaultTheme = theme === "vault";
+  const rootClass = [
+    variant === "portrait" ? "just-in-case-vertical" : "just-in-case",
+    isVaultTheme ? "theme-vault" : "theme-dom",
+  ].join(" ");
   const layoutKey = variant === "portrait" ? "vertical" : "widescreen";
+  const layoutPath = isVaultTheme ? `vault/${layoutKey}` : layoutKey;
   const isHost = mode === "host";
   const isViewerMode = mode === "viewer";
+  const labels = isVaultTheme
+    ? {
+        banker: "BANKER",
+        offer: "BANKER’S OFFER",
+        care: "IN BANKER’S CARE",
+        footer: "THE BANKER ALWAYS SETTLES THE BOOKS",
+        offerCopy: "Banker’s Offer",
+        seal: "BK",
+        offering: "The banker is making you an offer…",
+        paid: (offerAmt: string, caseAmt: string) =>
+          `Banker paid ${offerAmt} · Your case held ${caseAmt}`,
+      }
+    : {
+        banker: "DOM THE DON",
+        offer: "DOM’S OFFER",
+        care: "IN DOM’S CARE",
+        footer: "DOM ALWAYS SETTLES THE BOOKS",
+        offerCopy: "Dom’s Offer",
+        seal: "DD",
+        offering: "Dom is making you an offer…",
+        paid: (offerAmt: string, caseAmt: string) =>
+          `Dom paid ${offerAmt} · Your case held ${caseAmt}`,
+      };
 
   const [max, setMax] = useState(1_000_000);
   const [draft, setDraft] = useState(1_000_000);
@@ -251,10 +291,10 @@ export function JustInCaseGame({
         // Still load overlay path helpers for controllers.
         if (!isViewer) {
           setOverlayPaths({
-            cases: `/just-in-case/${publicToken}/${layoutKey}?overlay=cases`,
-            player: `/just-in-case/${publicToken}/${layoutKey}?overlay=player`,
-            offer: `/just-in-case/${publicToken}/${layoutKey}?overlay=offer`,
-            full: `/just-in-case/${publicToken}/${layoutKey}`,
+            cases: `/just-in-case/${publicToken}/${layoutPath}?overlay=cases`,
+            player: `/just-in-case/${publicToken}/${layoutPath}?overlay=player`,
+            offer: `/just-in-case/${publicToken}/${layoutPath}?overlay=offer`,
+            full: `/just-in-case/${publicToken}/${layoutPath}`,
           });
         }
         return;
@@ -264,14 +304,16 @@ export function JustInCaseGame({
         const res = await fetch("/api/just-in-case/session", { cache: "no-store" });
         const data = (await res.json().catch(() => ({}))) as {
           token?: string;
-          overlays?: { widescreen: OverlayPaths; vertical: OverlayPaths };
+          overlays?: OverlayPacks;
         };
         if (cancelled || !data.token || !data.overlays) return;
         localStorage.setItem(ROOM_KEY, data.token);
         setSyncToken(data.token);
-        setOverlayPaths(data.overlays[layoutKey]);
+        setOverlayPaths(
+          isVaultTheme ? data.overlays.vault[layoutKey] : data.overlays[layoutKey],
+        );
         const next = new URL(window.location.href);
-        next.pathname = `/just-in-case/${data.token}/${layoutKey}`;
+        next.pathname = `/just-in-case/${data.token}/${layoutPath}`;
         window.history.replaceState({}, "", next);
         return;
       }
@@ -287,15 +329,17 @@ export function JustInCaseGame({
       });
       const data = (await res.json().catch(() => ({}))) as {
         token?: string;
-        overlays?: { widescreen: OverlayPaths; vertical: OverlayPaths };
+        overlays?: OverlayPacks;
       };
       if (cancelled || !data.token || !data.overlays) return;
       localStorage.setItem(ROOM_KEY, data.token);
       setSyncToken(data.token);
-      setOverlayPaths(data.overlays[layoutKey]);
+      setOverlayPaths(
+        isVaultTheme ? data.overlays.vault[layoutKey] : data.overlays[layoutKey],
+      );
       const next = new URL(window.location.href);
       if (!next.pathname.includes(`/${data.token}/`)) {
-        next.pathname = `/just-in-case/${data.token}/${layoutKey}`;
+        next.pathname = `/just-in-case/${data.token}/${layoutPath}`;
         window.history.replaceState({}, "", next);
       }
     }
@@ -304,7 +348,7 @@ export function JustInCaseGame({
     return () => {
       cancelled = true;
     };
-  }, [isHost, isViewer, publicToken, layoutKey]);
+  }, [isHost, isViewer, publicToken, layoutKey, layoutPath, isVaultTheme]);
 
   // Poll shared DB state so OBS/TikTok always follow the same room.
   useEffect(() => {
@@ -535,7 +579,7 @@ export function JustInCaseGame({
     setPhase("final");
     sfx("deal");
     setTimeout(() => {
-      setResult(`Dom paid ${chips(offer)} · Your case held ${chips(mine?.value ?? 0)}`);
+      setResult(labels.paid(chips(offer), chips(mine?.value ?? 0)));
       setPhase("finished");
     }, 1800);
   }
@@ -581,13 +625,18 @@ export function JustInCaseGame({
       : phase === "opening"
         ? `Open ${target - roundCount} briefcase${target - roundCount === 1 ? "" : "s"}`
         : phase === "offer"
-          ? "Dom is making you an offer…"
+          ? labels.offering
           : phase === "final"
             ? "Opening your final briefcase…"
             : "The sit-down is over";
 
-  const otherLayoutHref =
-    variant === "portrait" ? "/just-in-case/widescreen" : "/just-in-case/vertical";
+  const otherLayoutHref = isVaultTheme
+    ? variant === "portrait"
+      ? "/just-in-case/vault/widescreen"
+      : "/just-in-case/vault/vertical"
+    : variant === "portrait"
+      ? "/just-in-case/widescreen"
+      : "/just-in-case/vertical";
   const otherLayoutLabel = variant === "portrait" ? "16:9 LAYOUT" : "9:16 LAYOUT";
 
   return (
@@ -633,13 +682,14 @@ export function JustInCaseGame({
         <section className="board">
           <aside className="player panel">
             <h2>YOUR BRIEFCASE</h2>
-            <div className="club-seal">DD</div>
+            <div className="club-seal">{labels.seal}</div>
             {mine ? (
               <Briefcase
                 c={mine}
                 selected
                 opened={phase === "final" || phase === "finished"}
                 revealing={phase === "final"}
+                careLabel={labels.care}
               />
             ) : (
               <div className="empty">
@@ -669,6 +719,7 @@ export function JustInCaseGame({
                   opened={opened.includes(c.id)}
                   hidden={c.id === reserved}
                   revealing={revealing === c.id}
+                  careLabel={labels.care}
                   onClick={
                     canInteract
                       ? () => (phase === "choose" ? select(c.id) : open(c.id))
@@ -690,9 +741,9 @@ export function JustInCaseGame({
           </section>
 
           <aside className={`dom panel ${phase === "offer" ? "calling" : ""}`}>
-            <h2>DOM THE DON</h2>
+            <h2>{labels.banker}</h2>
             <div className="portrait camera-slot" aria-label="Blank camera overlay area" />
-            <div className="offer-label">DOM’S OFFER</div>
+            <div className="offer-label">{labels.offer}</div>
             <div className={`offer ${phase === "offer" ? "active" : ""}`}>
               {offer ? chips(phase === "offer" ? offerDisplay : offer) : "—"}
             </div>
@@ -723,9 +774,7 @@ export function JustInCaseGame({
 
         <footer>
           <p>
-            {phase === "finished"
-              ? "DOM ALWAYS SETTLES THE BOOKS"
-              : `MAXIMUM CASE ${chips(max)}`}
+            {phase === "finished" ? labels.footer : `MAXIMUM CASE ${chips(max)}`}
           </p>
           {phase === "finished" && canInteract ? (
             <button onClick={() => reset()}>ANOTHER SIT-DOWN</button>
@@ -765,7 +814,7 @@ export function JustInCaseGame({
               </label>
               <Upload label="Background Music" value={music} onFile={(f) => file("music", f)} />
               <Upload
-                label="Dom’s Offer Sound"
+                label={`${labels.offerCopy} Sound`}
                 value={offerSound}
                 onFile={(f) => file("offer", f)}
               />
@@ -809,9 +858,9 @@ export function JustInCaseGame({
                       </button>
                       <button
                         type="button"
-                        onClick={() => void copyOverlay(overlayPaths.offer, "Dom’s Offer")}
+                        onClick={() => void copyOverlay(overlayPaths.offer, labels.offerCopy)}
                       >
-                        COPY DOM’S OFFER
+                        {`COPY ${labels.offerCopy.toUpperCase()}`}
                       </button>
                     </div>
                     <div>
@@ -822,7 +871,7 @@ export function JustInCaseGame({
                         OPEN YOUR CASE
                       </button>
                       <button type="button" onClick={() => openPublicOverlay("offer")}>
-                        OPEN DOM’S OFFER
+                        {`OPEN ${labels.offerCopy.toUpperCase()}`}
                       </button>
                     </div>
                   </>
@@ -876,6 +925,7 @@ function Briefcase({
   selected,
   hidden,
   revealing,
+  careLabel = "IN DOM’S CARE",
   onClick,
 }: {
   c: Case;
@@ -883,9 +933,10 @@ function Briefcase({
   selected?: boolean;
   hidden?: boolean;
   revealing?: boolean;
+  careLabel?: string;
   onClick?: () => void;
 }) {
-  if (hidden) return <div className="brief-slot">IN DOM’S CARE</div>;
+  if (hidden) return <div className="brief-slot">{careLabel}</div>;
   return (
     <button
       className={`briefcase ${opened ? "opened" : ""} ${selected ? "selected" : ""} ${revealing ? "revealing" : ""}`}

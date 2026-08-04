@@ -1,4 +1,4 @@
-import { JustInCaseLandscape } from "@/components/just-in-case/JustInCaseLandscape";
+import { JustInCasePortrait } from "@/components/just-in-case/JustInCasePortrait";
 import { ensurePublicJustInCaseRoom } from "@/lib/just-in-case-sync";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +9,11 @@ type Props = {
 };
 
 export const metadata = {
-  title: "Just in Case Overlay · 16:9",
-  description: "Public Just in Case widescreen / OBS overlay",
+  title: "Vault Overlay · 9:16",
+  description: "Public Vault vertical / OBS overlay",
 };
 
-export default async function PublicJustInCaseWidescreenPage({
+export default async function PublicVaultVerticalPage({
   params,
   searchParams,
 }: Props) {
@@ -22,11 +22,10 @@ export default async function PublicJustInCaseWidescreenPage({
   await ensurePublicJustInCaseRoom(token);
   const isOverlay = overlay === "cases" || overlay === "player" || overlay === "offer";
 
-  // Overlay views are follow-only. Full game URL can control AND follow the room.
   return (
-    <JustInCaseLandscape
+    <JustInCasePortrait
       mode={isOverlay ? "viewer" : "open"}
-      theme="dom"
+      theme="vault"
       publicToken={token}
     />
   );

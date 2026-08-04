@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Just in Case · Choose size",
-  description: "Choose 16:9 or 9:16 before opening Just in Case",
+  title: "Just in Case · Choose template",
+  description: "Choose Dom or Vault, then 16:9 or 9:16",
 };
 
 export default async function JustInCaseChooserPage() {

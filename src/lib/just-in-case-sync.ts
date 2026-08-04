@@ -178,19 +178,23 @@ export function isValidJustInCaseState(
   );
 }
 
+function overlayPack(base: string) {
+  return {
+    cases: `${base}?overlay=cases`,
+    player: `${base}?overlay=player`,
+    offer: `${base}?overlay=offer`,
+    full: base,
+  };
+}
+
+/** Dom (default routes) + Vault template overlay URL packs. */
 export function buildJustInCaseOverlayPaths(token: string) {
   return {
-    widescreen: {
-      cases: `/just-in-case/${token}/widescreen?overlay=cases`,
-      player: `/just-in-case/${token}/widescreen?overlay=player`,
-      offer: `/just-in-case/${token}/widescreen?overlay=offer`,
-      full: `/just-in-case/${token}/widescreen`,
-    },
-    vertical: {
-      cases: `/just-in-case/${token}/vertical?overlay=cases`,
-      player: `/just-in-case/${token}/vertical?overlay=player`,
-      offer: `/just-in-case/${token}/vertical?overlay=offer`,
-      full: `/just-in-case/${token}/vertical`,
+    widescreen: overlayPack(`/just-in-case/${token}/widescreen`),
+    vertical: overlayPack(`/just-in-case/${token}/vertical`),
+    vault: {
+      widescreen: overlayPack(`/just-in-case/${token}/vault/widescreen`),
+      vertical: overlayPack(`/just-in-case/${token}/vault/vertical`),
     },
   };
 }

@@ -1,13 +1,29 @@
 "use client";
 
-import { JustInCaseGame, type JustInCaseMode } from "./JustInCaseGame";
+import {
+  JustInCaseGame,
+  type JustInCaseMode,
+  type JustInCaseTheme,
+} from "./JustInCaseGame";
 import "./just-in-case-16x9.css";
 
 type Props = {
   mode?: JustInCaseMode;
+  theme?: JustInCaseTheme;
   publicToken?: string;
 };
 
-export function JustInCaseLandscape({ mode = "open", publicToken }: Props) {
-  return <JustInCaseGame variant="landscape" mode={mode} publicToken={publicToken} />;
+export function JustInCaseLandscape({
+  mode = "open",
+  theme = "dom",
+  publicToken,
+}: Props) {
+  return (
+    <JustInCaseGame
+      variant="landscape"
+      theme={theme}
+      mode={mode}
+      publicToken={publicToken}
+    />
+  );
 }

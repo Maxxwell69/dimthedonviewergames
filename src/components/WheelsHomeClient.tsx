@@ -126,16 +126,19 @@ export function WheelsHomeClient({
             <div>
               <h3>Just in Case</h3>
               <p>
-                Public game — no login in TikTok/OBS. Open the public page, then copy overlay URLs
-                from Owner Setup (never paste a /dashboard link into Studio).
+                Public game — Dom template plus a separate Vault banker template. Open the chooser,
+                then copy overlay URLs from Owner Setup (never paste a /dashboard link into Studio).
               </p>
             </div>
             <div className="btn-row wrap">
-              <Link className="btn gold" href="/just-in-case/vertical">
-                Open 9:16 public
+              <Link className="btn gold" href="/just-in-case">
+                Choose template
               </Link>
-              <Link className="btn ghost" href="/just-in-case/widescreen">
-                Open 16:9 public
+              <Link className="btn ghost" href="/just-in-case/vertical">
+                Dom 9:16
+              </Link>
+              <Link className="btn ghost" href="/just-in-case/vault/vertical">
+                Vault 9:16
               </Link>
             </div>
           </article>

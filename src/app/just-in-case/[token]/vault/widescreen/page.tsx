@@ -9,11 +9,11 @@ type Props = {
 };
 
 export const metadata = {
-  title: "Just in Case Overlay · 16:9",
-  description: "Public Just in Case widescreen / OBS overlay",
+  title: "Vault Overlay · 16:9",
+  description: "Public Vault widescreen / OBS overlay",
 };
 
-export default async function PublicJustInCaseWidescreenPage({
+export default async function PublicVaultWidescreenPage({
   params,
   searchParams,
 }: Props) {
@@ -22,11 +22,10 @@ export default async function PublicJustInCaseWidescreenPage({
   await ensurePublicJustInCaseRoom(token);
   const isOverlay = overlay === "cases" || overlay === "player" || overlay === "offer";
 
-  // Overlay views are follow-only. Full game URL can control AND follow the room.
   return (
     <JustInCaseLandscape
       mode={isOverlay ? "viewer" : "open"}
-      theme="dom"
+      theme="vault"
       publicToken={token}
     />
   );
