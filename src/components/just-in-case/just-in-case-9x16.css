@@ -599,4 +599,67 @@
   align-self: center;
 }
 
+/* Custom zone backdrops (Your Case / Banker / Briefcases stage) */
+.just-in-case-vertical .player-stage,
+.just-in-case-vertical .cases {
+  position: relative;
+}
+.just-in-case-vertical .player-stage {
+  width: 100%;
+  min-height: 110px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.just-in-case-vertical .zone-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+.just-in-case-vertical .zone-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #02040322, #02040366);
+}
+.just-in-case-vertical .player-stage.has-zone-bg > :not(.zone-bg),
+.just-in-case-vertical .cases.has-zone-bg > :not(.zone-bg) {
+  position: relative;
+  z-index: 2;
+}
+.just-in-case-vertical .cases.has-zone-bg {
+  background: #08150f;
+  overflow: hidden;
+}
+.just-in-case-vertical .portrait.has-custom-bg {
+  background-color: #080a09 !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+.just-in-case-vertical .portrait.has-custom-bg::after {
+  display: none;
+}
+.just-in-case-vertical .upload-row {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+}
+.just-in-case-vertical .upload-row .upload {
+  margin: 0;
+}
+.just-in-case-vertical .upload-clear {
+  justify-self: end;
+  padding: 5px 10px;
+  border: 1px solid #816232;
+  background: #0a1510;
+  color: #efd083;
+  font: 800 8px Arial, sans-serif;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
 

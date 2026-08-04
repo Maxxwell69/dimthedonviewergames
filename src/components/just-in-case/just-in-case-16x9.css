@@ -236,3 +236,67 @@
   min-height: calc(100vh - 90px) !important;
 }
 
+/* Custom zone backdrops (Your Case / Banker / Briefcases stage) */
+.just-in-case .player-stage,
+.just-in-case .cases {
+  position: relative;
+}
+.just-in-case .player-stage {
+  width: 100%;
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.just-in-case .zone-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+.just-in-case .zone-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #02040322, #02040366);
+}
+.just-in-case .player-stage.has-zone-bg > :not(.zone-bg),
+.just-in-case .cases.has-zone-bg > :not(.zone-bg) {
+  position: relative;
+  z-index: 2;
+}
+.just-in-case .cases.has-zone-bg {
+  background: #08150f;
+  overflow: hidden;
+}
+.just-in-case .portrait.has-custom-bg {
+  background-color: #080a09 !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+.just-in-case .portrait.has-custom-bg::after {
+  display: none;
+}
+.just-in-case .upload-row {
+  display: grid;
+  gap: 4px;
+  margin: 7px 0;
+}
+.just-in-case .upload-row .upload {
+  margin: 0;
+}
+.just-in-case .upload-clear {
+  justify-self: end;
+  padding: 5px 10px;
+  border: 1px solid #816232;
+  background: #0a1510;
+  color: #efd083;
+  font: 800 8px Arial, sans-serif;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+

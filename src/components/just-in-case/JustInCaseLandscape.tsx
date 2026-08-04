@@ -6,6 +6,7 @@ import {
   type JustInCaseTheme,
 } from "./JustInCaseGame";
 import "./just-in-case-16x9.css";
+import "./just-in-case-dom-theme.css";
 
 type Props = {
   mode?: JustInCaseMode;

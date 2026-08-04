@@ -9,11 +9,30 @@ const RATIOS = [
 ];
 const ROUNDS = [6, 5, 4, 3, 2, 1];
 const SYNC_KEY = "dom-the-don-shared-game-v1";
+const ZONE_BG_KEY_VAULT = "dom-the-don-zone-bgs-vault-v1";
+const ZONE_BG_KEY_DOM = "dom-the-don-zone-bgs-dom-v1";
 
 type Phase = "choose" | "opening" | "offer" | "final" | "finished";
 type Case = { id: number; value: number };
 type SoundFile = { name: string; url: string } | null;
+type ImageFile = { name: string; url: string } | null;
+type ZoneBgKind = "player" | "dom" | "stage";
 type OverlayView = "full" | "cases" | "player" | "offer";
+
+const DOM_ZONE_DEFAULTS: Record<ZoneBgKind, NonNullable<ImageFile>> = {
+  player: {
+    name: "Your Case Stage",
+    url: "/assets/just-in-case/dom/your-case-stage.png",
+  },
+  dom: {
+    name: "City Skyline",
+    url: "/assets/just-in-case/dom/city-skyline.png",
+  },
+  stage: {
+    name: "Cases Stage",
+    url: "/assets/just-in-case/dom/cases-stage.png",
+  },
+};
 type SharedGame = {
   max: number;
   draft: number;
@@ -92,12 +111,14 @@ export function JustInCaseGame({
   publicToken,
 }: JustInCaseGameProps) {
   const isVaultTheme = theme === "vault";
+  const isDomTheme = theme === "dom";
   const rootClass = [
     variant === "portrait" ? "just-in-case-vertical" : "just-in-case",
-    isVaultTheme ? "theme-vault" : "theme-dom",
+    isDomTheme ? "theme-dom" : "theme-vault",
   ].join(" ");
   const layoutKey = variant === "portrait" ? "vertical" : "widescreen";
   const layoutPath = isVaultTheme ? `vault/${layoutKey}` : layoutKey;
+  const zoneBgKey = isDomTheme ? ZONE_BG_KEY_DOM : ZONE_BG_KEY_VAULT;
   const isHost = mode === "host";
   const isViewerMode = mode === "viewer";
   const labels = isVaultTheme
@@ -143,6 +164,13 @@ export function JustInCaseGame({
   const [music, setMusic] = useState<SoundFile>(null);
   const [offerSound, setOfferSound] = useState<SoundFile>(null);
   const [finalSound, setFinalSound] = useState<SoundFile>(null);
+  const [playerBg, setPlayerBg] = useState<ImageFile>(
+    isDomTheme ? DOM_ZONE_DEFAULTS.player : null,
+  );
+  const [domBg, setDomBg] = useState<ImageFile>(isDomTheme ? DOM_ZONE_DEFAULTS.dom : null);
+  const [stageBg, setStageBg] = useState<ImageFile>(
+    isDomTheme ? DOM_ZONE_DEFAULTS.stage : null,
+  );
   const [overlay, setOverlay] = useState<OverlayView>("full");
   const audioCtx = useRef<AudioContext | null>(null);
   const musicAudio = useRef<HTMLAudioElement | null>(null);
@@ -174,7 +202,44 @@ export function JustInCaseGame({
     setOrigin(window.location.origin);
     const view = new URLSearchParams(window.location.search).get("overlay");
     if (view === "cases" || view === "player" || view === "offer") setOverlay(view);
-  }, []);
+    try {
+      const raw = localStorage.getItem(zoneBgKey);
+      if (!raw) {
+        if (isDomTheme) {
+          setPlayerBg(DOM_ZONE_DEFAULTS.player);
+          setDomBg(DOM_ZONE_DEFAULTS.dom);
+          setStageBg(DOM_ZONE_DEFAULTS.stage);
+        } else {
+          setPlayerBg(null);
+          setDomBg(null);
+          setStageBg(null);
+        }
+        return;
+      }
+      const saved = JSON.parse(raw) as {
+        player?: ImageFile;
+        dom?: ImageFile;
+        stage?: ImageFile;
+      };
+      setPlayerBg(saved.player?.url ? saved.player : isDomTheme ? DOM_ZONE_DEFAULTS.player : null);
+      setDomBg(saved.dom?.url ? saved.dom : isDomTheme ? DOM_ZONE_DEFAULTS.dom : null);
+      setStageBg(saved.stage?.url ? saved.stage : isDomTheme ? DOM_ZONE_DEFAULTS.stage : null);
+    } catch {
+      localStorage.removeItem(zoneBgKey);
+    }
+  }, [zoneBgKey, isDomTheme]);
+
+  function persistZoneBgs(next: {
+    player: ImageFile;
+    dom: ImageFile;
+    stage: ImageFile;
+  }) {
+    try {
+      localStorage.setItem(zoneBgKey, JSON.stringify(next));
+    } catch {
+      /* quota / private mode — keep in-memory only */
+    }
+  }
 
   function setView(view: OverlayView) {
     setOverlay(view);
@@ -619,6 +684,31 @@ export function JustInCaseGame({
     else setFinalSound(next);
   }
 
+  function setZoneBg(kind: ZoneBgKind, next: ImageFile) {
+    const player = kind === "player" ? next : playerBg;
+    const dom = kind === "dom" ? next : domBg;
+    const stage = kind === "stage" ? next : stageBg;
+    if (kind === "player") setPlayerBg(next);
+    else if (kind === "dom") setDomBg(next);
+    else setStageBg(next);
+    persistZoneBgs({ player, dom, stage });
+  }
+
+  function clearZoneBg(kind: ZoneBgKind) {
+    setZoneBg(kind, isDomTheme ? DOM_ZONE_DEFAULTS[kind] : null);
+  }
+
+  function imageFile(kind: ZoneBgKind, f?: File) {
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result || "");
+      if (!url) return;
+      setZoneBg(kind, { name: f.name, url });
+    };
+    reader.readAsDataURL(f);
+  }
+
   const status =
     phase === "choose"
       ? "Choose the briefcase you keep"
@@ -683,20 +773,29 @@ export function JustInCaseGame({
           <aside className="player panel">
             <h2>YOUR BRIEFCASE</h2>
             <div className="club-seal">{labels.seal}</div>
-            {mine ? (
-              <Briefcase
-                c={mine}
-                selected
-                opened={phase === "final" || phase === "finished"}
-                revealing={phase === "final"}
-                careLabel={labels.care}
-              />
-            ) : (
-              <div className="empty">
-                ?
-                <small>Waiting on your choice</small>
-              </div>
-            )}
+            <div className={`player-stage ${playerBg ? "has-zone-bg" : ""}`}>
+              {playerBg ? (
+                <div
+                  className="zone-bg"
+                  style={{ backgroundImage: `url(${playerBg.url})` }}
+                  aria-hidden
+                />
+              ) : null}
+              {mine ? (
+                <Briefcase
+                  c={mine}
+                  selected
+                  opened={phase === "final" || phase === "finished"}
+                  revealing={phase === "final"}
+                  careLabel={labels.care}
+                />
+              ) : (
+                <div className="empty">
+                  ?
+                  <small>Waiting on your choice</small>
+                </div>
+              )}
+            </div>
             {(phase === "final" || phase === "finished") && (
               <div className="verdict">
                 {phase === "final" ? "THE LOCK IS TURNING…" : result}
@@ -711,7 +810,14 @@ export function JustInCaseGame({
 
           <section className="stage panel">
             <div className="instruction">◆ {status} ◆</div>
-            <div className="cases">
+            <div className={`cases ${stageBg ? "has-zone-bg" : ""}`}>
+              {stageBg ? (
+                <div
+                  className="zone-bg"
+                  style={{ backgroundImage: `url(${stageBg.url})` }}
+                  aria-hidden
+                />
+              ) : null}
               {cases.map((c) => (
                 <Briefcase
                   key={c.id}
@@ -742,7 +848,17 @@ export function JustInCaseGame({
 
           <aside className={`dom panel ${phase === "offer" ? "calling" : ""}`}>
             <h2>{labels.banker}</h2>
-            <div className="portrait camera-slot" aria-label="Blank camera overlay area" />
+            <div
+              className={`portrait ${domBg ? "has-custom-bg" : "camera-slot"}`}
+              style={
+                domBg
+                  ? {
+                      backgroundImage: `url(${domBg.url})`,
+                    }
+                  : undefined
+              }
+              aria-label={domBg ? `${labels.banker} backdrop` : "Blank camera overlay area"}
+            />
             <div className="offer-label">{labels.offer}</div>
             <div className={`offer ${phase === "offer" ? "active" : ""}`}>
               {offer ? chips(phase === "offer" ? offerDisplay : offer) : "—"}
@@ -803,6 +919,36 @@ export function JustInCaseGame({
                 <small>TOP BRIEFCASE</small>
                 <strong>{chips(Math.max(100, draft || 100))}</strong>
               </div>
+              <h3>ZONE BACKDROPS</h3>
+              <p className="overlay-url-hint">
+                {isDomTheme
+                  ? "Dom neon stage ships with default backdrops. Swap images for Your Case, Dom’s box, and the briefcases stage anytime."
+                  : "Optional images behind Your Case, the Banker box, and the briefcases stage. Saved in this browser for OBS on the same machine."}
+              </p>
+              <Upload
+                label="Your Case Background"
+                value={playerBg}
+                accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
+                hint="PNG, JPG, WEBP, or GIF"
+                onFile={(f) => imageFile("player", f)}
+                onClear={() => clearZoneBg("player")}
+              />
+              <Upload
+                label={`${labels.banker} Box Background`}
+                value={domBg}
+                accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
+                hint="PNG, JPG, WEBP, or GIF — replaces blank camera box"
+                onFile={(f) => imageFile("dom", f)}
+                onClear={() => clearZoneBg("dom")}
+              />
+              <Upload
+                label="Briefcases Stage Background"
+                value={stageBg}
+                accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
+                hint="PNG, JPG, WEBP, or GIF"
+                onFile={(f) => imageFile("stage", f)}
+                onClear={() => clearZoneBg("stage")}
+              />
               <h3>CUSTOM SHOW AUDIO</h3>
               <label className="music-toggle">
                 <input
@@ -895,27 +1041,40 @@ function Upload({
   label,
   value,
   onFile,
+  onClear,
+  accept = "audio/*,.mp3,.wav,.m4a,.ogg",
+  hint = "MP3, WAV, M4A, or OGG",
 }: {
   label: string;
-  value: SoundFile;
+  value: SoundFile | ImageFile;
   onFile: (f?: File) => void;
+  onClear?: () => void;
+  accept?: string;
+  hint?: string;
 }) {
   return (
-    <label className="upload">
-      <span>
-        <b>
-          {value ? "✓ " : ""}
-          {label}
-        </b>
-        <small>{value?.name ?? "MP3, WAV, M4A, or OGG"}</small>
-      </span>
-      <em>{value ? "CHANGE" : "UPLOAD"}</em>
-      <input
-        type="file"
-        accept="audio/*,.mp3,.wav,.m4a,.ogg"
-        onChange={(e) => onFile(e.target.files?.[0])}
-      />
-    </label>
+    <div className="upload-row">
+      <label className="upload">
+        <span>
+          <b>
+            {value ? "✓ " : ""}
+            {label}
+          </b>
+          <small>{value?.name ?? hint}</small>
+        </span>
+        <em>{value ? "CHANGE" : "UPLOAD"}</em>
+        <input
+          type="file"
+          accept={accept}
+          onChange={(e) => onFile(e.target.files?.[0])}
+        />
+      </label>
+      {value && onClear ? (
+        <button type="button" className="upload-clear" onClick={onClear}>
+          CLEAR
+        </button>
+      ) : null}
+    </div>
   );
 }
 

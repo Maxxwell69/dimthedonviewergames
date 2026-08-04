@@ -101,9 +101,10 @@ export function JustInCaseSizeChooser({ publicAccess = false }: Props) {
       </header>
 
       <section className="panel studio-games-panel">
-        <h2>Dom the Don</h2>
+        <h2>Dom the Don · Neon Stage</h2>
         <p className="hint">
-          Your current Dom-branded sit-down. Existing OBS links keep working on these routes.
+          Blue neon stage with default Your Case / Dom box / briefcases backdrops. Change those
+          images in Owner Setup. Existing Dom OBS links keep working.
         </p>
         <div className="studio-games-grid size-chooser-grid">
           <article className="studio-game-card size-choice-card">
@@ -137,8 +138,8 @@ export function JustInCaseSizeChooser({ publicAccess = false }: Props) {
       <section className="panel studio-games-panel">
         <h2>Vault template</h2>
         <p className="hint">
-          Separate classic banker template. Same game engine — Banker wording instead of Dom.
-          Does not change your Dom routes or OBS links.
+          Classic brass / banker look (not neon). Banker wording instead of Dom. Optional custom
+          backdrops in Owner Setup. Does not change your Dom routes or OBS links.
         </p>
         <div className="studio-games-grid size-chooser-grid">
           <article className="studio-game-card size-choice-card">

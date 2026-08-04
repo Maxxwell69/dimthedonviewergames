@@ -1,0 +1,288 @@
+/* Dom the Don · Neon Stage template (separate from Vault / Banker) */
+.theme-dom {
+  --black: #030713;
+  --ink: #07101f;
+  --green: #102848;
+  --emerald: #1d4f8a;
+  --burgundy: #1a3a6e;
+  --brass: #8eb6ef;
+  --gold: #e8f1ff;
+  --ivory: #f2f7ff;
+  --neon: #4cc3ff;
+  --neon-hot: #ffb24a;
+  --panel: #0b1730;
+  background: radial-gradient(circle at 50% 0, #183a6a 0, #07101f 40%, #02040c 78%) !important;
+  color: var(--ivory);
+}
+
+.theme-dom .game {
+  background:
+    linear-gradient(120deg, #0008, transparent 30% 70%, #0009),
+    radial-gradient(ellipse at 50% 30%, #1a3f7a55, transparent 55%) !important;
+}
+
+.theme-dom .panel,
+.theme-dom header,
+.theme-dom footer {
+  border-color: #6f98d4 !important;
+  box-shadow:
+    inset 0 0 0 3px #050b16,
+    inset 0 0 0 4px #3a5f98,
+    0 9px 30px #000c !important;
+  background: linear-gradient(145deg, #12233f, #070e1c) !important;
+}
+
+.theme-dom .panel h2,
+.just-in-case-vertical.theme-dom .panel h2 {
+  background: linear-gradient(#16325f, #0a1833) !important;
+  border-color: #7eaddf !important;
+  color: #f4f8ff !important;
+  text-shadow: 0 0 14px #5eb7ff66;
+}
+
+.theme-dom .top-tools button,
+.theme-dom .admin-exit {
+  border-color: #4f74a8 !important;
+  background: #07101d !important;
+  color: #9eb8df !important;
+}
+.theme-dom .top-tools .on,
+.theme-dom .top-tools .restart {
+  color: #dff0ff !important;
+  border-color: #79b4ef !important;
+  background: linear-gradient(#1a3358, #08111f) !important;
+}
+
+.theme-dom .instruction {
+  color: #d7e9ff !important;
+  text-shadow: 0 0 12px #4cc3ff88;
+}
+
+.theme-dom .briefcase,
+.theme-dom .brief-slot {
+  border-color: #9eb6d8 !important;
+  background: linear-gradient(145deg, #1c2f52, #081225 62%) !important;
+  color: #fff !important;
+  box-shadow: inset 0 0 14px #000a, 0 0 12px #3d7fd644 !important;
+}
+.theme-dom .briefcase::before,
+.theme-dom .briefcase:before {
+  border-color: #6f8fbf !important;
+}
+.theme-dom .briefcase span {
+  border-color: #c5d4ea !important;
+  color: #fff !important;
+  text-shadow: 0 2px #000, 0 0 12px #6eb6ff99 !important;
+}
+.theme-dom .handle {
+  border-color: #b7cce8 !important;
+  background: #10182a !important;
+}
+.theme-dom .lock {
+  color: #d7e7ff !important;
+}
+.theme-dom .briefcase.opened,
+.theme-dom .briefcase.revealing {
+  background: linear-gradient(#102038, #dff3ff 36%, #7ec8ff) !important;
+  color: #07101d !important;
+  box-shadow: 0 0 26px #7ed0ff, 0 0 48px #4cc3ffcc, inset 0 0 14px #fff !important;
+  filter: brightness(1.2);
+}
+.theme-dom .briefcase.opened span,
+.theme-dom .briefcase.revealing span {
+  color: #07101d !important;
+  text-shadow: 0 0 10px #fff !important;
+}
+.theme-dom .brief-slot {
+  color: #8eabcd !important;
+  background: #07111f !important;
+}
+
+.theme-dom .prizes span {
+  background: #0a1528 !important;
+  border-color: #6f98d4 !important;
+  color: #d9ebff !important;
+}
+.theme-dom .prizes .top {
+  background: #2a4f8a !important;
+  color: #fff !important;
+  box-shadow: 0 0 18px #4cc3ffaa !important;
+}
+
+.theme-dom .odds,
+.theme-dom .stats {
+  background: #07111f !important;
+  border-color: #4f74a8 !important;
+}
+.theme-dom .odds small,
+.theme-dom .odds span,
+.theme-dom .stats span {
+  color: #8eabcd !important;
+}
+.theme-dom .odds strong,
+.theme-dom .stats strong {
+  color: #e8f1ff !important;
+}
+
+.theme-dom .empty {
+  border-color: #7eaddf !important;
+  color: #d7e9ff !important;
+  background: #07111f88;
+}
+
+.theme-dom .offer-label {
+  color: #a8c8ef !important;
+}
+.theme-dom .offer {
+  background: linear-gradient(#dce9ff, #9ebce8) !important;
+  color: #0a1424 !important;
+  border-color: #6f98d4 !important;
+}
+
+.theme-dom .take {
+  background: linear-gradient(#2a6db8, #123b72) !important;
+  border-color: #8ec4ff !important;
+  color: #f2f8ff !important;
+}
+.theme-dom .walk {
+  background: linear-gradient(#2a3348, #121722) !important;
+  border-color: #7a8aaa !important;
+  color: #e6edf8 !important;
+}
+
+/* Dom cityscape box — more square */
+.just-in-case-vertical.theme-dom .dom {
+  grid-template-rows: auto auto auto auto 35px;
+  min-height: 280px;
+}
+.just-in-case-vertical.theme-dom .portrait,
+.just-in-case-vertical.theme-dom .portrait.has-custom-bg {
+  width: min(100%, 210px);
+  height: auto !important;
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+  justify-self: center;
+  border-color: #7eaddf !important;
+  box-shadow: 0 0 18px #4cc3ff55;
+  background-size: cover !important;
+  background-position: center center !important;
+}
+.theme-dom .portrait.has-custom-bg {
+  border-color: #7eaddf !important;
+  box-shadow: 0 0 18px #4cc3ff55;
+  aspect-ratio: 1 / 1;
+  background-size: cover !important;
+  background-position: center center !important;
+}
+.just-in-case.theme-dom .portrait.has-custom-bg {
+  width: min(100%, 330px);
+  height: auto !important;
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+  align-self: center;
+}
+
+/* Your Case stage: portrait portal so yellow marquee lights stay in frame */
+.theme-dom .player-stage {
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 3 / 4;
+  max-height: 240px;
+  background: #07101f;
+  border: 1px solid #4f74a8;
+  overflow: hidden;
+}
+.just-in-case-vertical.theme-dom .player-stage {
+  aspect-ratio: 3 / 4;
+  max-height: 210px;
+  min-height: 170px;
+}
+.just-in-case-vertical.theme-dom .player,
+.just-in-case-vertical.theme-dom .dom {
+  min-height: 300px;
+  align-content: start;
+}
+.just-in-case-vertical.theme-dom .empty {
+  width: 70%;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 5 / 4;
+  max-height: 58%;
+  align-self: center;
+  background: #07111fcc;
+  border: 2px dashed #cfe4ff !important;
+  color: #f2f7ff !important;
+}
+.just-in-case.theme-dom .empty {
+  width: min(78%, 220px);
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 5 / 4;
+  background: #07111fcc;
+  border: 2px dashed #cfe4ff !important;
+}
+.theme-dom .player-stage .zone-bg {
+  background-size: cover !important;
+  background-position: center center !important;
+  background-color: #07101f;
+}
+.theme-dom .cases .zone-bg {
+  background-size: cover !important;
+  background-position: center center !important;
+  background-color: #07101f;
+}
+.theme-dom .zone-bg::after {
+  background: linear-gradient(180deg, #03071318, #03071355);
+}
+.theme-dom .cases.has-zone-bg {
+  border-color: #6f98d4 !important;
+  background: #07101f !important;
+}
+.theme-dom .stage::before,
+.theme-dom .stage:before {
+  border-color: #4f74a8 !important;
+  opacity: 0.45;
+}
+.just-in-case-vertical.theme-dom .overlay-full .dom .portrait.has-custom-bg {
+  width: min(100%, 205px);
+}
+
+.theme-dom footer p,
+.theme-dom footer span {
+  color: #9eb8df !important;
+}
+.theme-dom footer button,
+.theme-dom .save {
+  background: linear-gradient(#2a6db8, #123b72) !important;
+  border-color: #8ec4ff !important;
+  color: #f2f8ff !important;
+}
+
+.theme-dom .modal-bg {
+  background: #02050de8 !important;
+}
+.theme-dom .upload {
+  border-color: #4f74a8 !important;
+  background: #0a1528 !important;
+}
+.theme-dom .upload span b,
+.theme-dom .upload em,
+.theme-dom .upload-clear {
+  color: #d7e9ff !important;
+  border-color: #6f98d4 !important;
+}
+.theme-dom .upload-clear {
+  background: #0a1528 !important;
+}
+
+.theme-dom .verdict {
+  background: #cfe4ff !important;
+  color: #0a1424 !important;
+  border-color: #6f98d4 !important;
+}
+
+.theme-dom .brand h1,
+.theme-dom .round {
+  color: #e8f1ff !important;
+  text-shadow: 0 0 18px #4cc3ff66;
+}
